@@ -1,0 +1,20 @@
+{% extends 'catalogo/base.html' %}
+
+{% block titulo %}Excluir {{ jogo.titulo }} - GameDex{% endblock %}
+
+{% block conteudo %}
+<section class="caixa-formulario caixa-perigo">
+    <h1>Excluir jogo</h1>
+
+    <p>Tem certeza que deseja excluir <strong>{{ jogo.titulo }}</strong>?</p>
+    <p class="aviso">Essa ação também removerá as avaliações relacionadas.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="botoes">
+            <a href="{% url 'detalhe_jogo' jogo.id %}" class="botao botao-secundario">Cancelar</a>
+            <button type="submit" class="botao botao-perigo">Excluir</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

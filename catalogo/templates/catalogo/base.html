@@ -1,0 +1,38 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}GameDex{% endblock %}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'catalogo/css/style.css' %}">
+</head>
+<body>
+    {% with pagina=request.resolver_match.url_name %}
+    <header class="navbar">
+        <div class="container navbar-conteudo">
+            <a href="{% url 'inicio' %}" class="logo">GameDex</a>
+
+            <nav class="menu">
+                <a href="{% url 'inicio' %}" {% if pagina == 'inicio' %}class="ativo"{% endif %}>Início</a>
+                <a href="{% url 'lista_jogos' %}" {% if pagina == 'lista_jogos' %}class="ativo"{% endif %}>Jogos</a>
+                <a href="{% url 'novo_jogo' %}" {% if pagina == 'novo_jogo' %}class="ativo"{% endif %}>Cadastrar jogo</a>
+                <a href="{% url 'admin:index' %}">Admin</a>
+            </nav>
+        </div>
+    </header>
+    {% endwith %}
+
+    <main class="container conteudo">
+        {% block conteudo %}{% endblock %}
+    </main>
+
+    <footer class="rodape">
+        <p>GameDex - Projeto acadêmico em Django</p>
+    </footer>
+</body>
+</html>

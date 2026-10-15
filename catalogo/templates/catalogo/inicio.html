@@ -1,0 +1,28 @@
+{% extends 'catalogo/base.html' %}
+
+{% block conteudo %}
+<section class="hero">
+    <h1>GameDex</h1>
+    <p class="hero-subtitulo">Seu catálogo de jogos</p>
+    <p class="hero-texto">Cadastre, organize e avalie seus jogos favoritos.</p>
+
+    <div class="botoes">
+        <a href="{% url 'lista_jogos' %}" class="botao">Ver jogos</a>
+        <a href="{% url 'novo_jogo' %}" class="botao botao-secundario">Cadastrar jogo</a>
+    </div>
+</section>
+
+<section>
+    <h2>Últimos jogos cadastrados</h2>
+
+    {% if destaques %}
+    <div class="grade-cards">
+        {% for jogo in destaques %}
+            {% include 'catalogo/card_jogo.html' %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="vazio">Nenhum jogo cadastrado ainda.</p>
+    {% endif %}
+</section>
+{% endblock %}

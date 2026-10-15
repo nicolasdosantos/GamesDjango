@@ -1,0 +1,19 @@
+{% extends 'catalogo/base.html' %}
+
+{% block titulo %}Avaliar {{ jogo.titulo }} - GameDex{% endblock %}
+
+{% block conteudo %}
+<section class="caixa-formulario">
+    <h1>Avaliar {{ jogo.titulo }}</h1>
+
+    <form method="post" class="formulario">
+        {% csrf_token %}
+        {{ form.as_div }}
+
+        <div class="botoes">
+            <button type="submit" class="botao">Enviar avaliação</button>
+            <a href="{% url 'detalhe_jogo' jogo.id %}" class="botao botao-secundario">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

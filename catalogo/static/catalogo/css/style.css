@@ -1,0 +1,528 @@
+:root {
+    --fundo: #151826;
+    --card: #1f2336;
+    --card-claro: #2a2f47;
+    --borda: #353b57;
+    --texto: #e8eaf2;
+    --texto-suave: #a0a6bf;
+    --roxo: #8b7cf6;
+    --roxo-escuro: #6c5ce7;
+    --azul: #4fa3e3;
+    --verde: #3fbf8f;
+    --amarelo: #e0b341;
+    --vermelho: #e5484d;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background-color: var(--fundo);
+    color: var(--texto);
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+h1, h2, h3 {
+    font-family: "Chakra Petch", "Segoe UI", sans-serif;
+    line-height: 1.2;
+    margin-top: 0;
+}
+
+h1 {
+    font-size: 2.2rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+    margin-top: 32px;
+}
+
+a {
+    color: var(--roxo);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--azul);
+    outline-offset: 2px;
+}
+
+.container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.conteudo {
+    flex: 1;
+    padding-top: 32px;
+    padding-bottom: 48px;
+}
+
+.vazio {
+    color: var(--texto-suave);
+    background-color: var(--card);
+    border: 1px dashed var(--borda);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.botoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.botao {
+    display: inline-block;
+    background-color: var(--roxo-escuro);
+    color: #ffffff;
+    border: 2px solid var(--roxo-escuro);
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.botao:hover {
+    background-color: var(--roxo);
+    border-color: var(--roxo);
+}
+
+.botao-secundario {
+    background-color: transparent;
+    color: var(--texto);
+    border-color: var(--borda);
+}
+
+.botao-secundario:hover {
+    background-color: var(--card-claro);
+    border-color: var(--texto-suave);
+}
+
+.botao-perigo {
+    background-color: var(--vermelho);
+    border-color: var(--vermelho);
+}
+
+.botao-perigo:hover {
+    background-color: #c93a3f;
+    border-color: #c93a3f;
+}
+
+.botao-pequeno {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+}
+
+.navbar {
+    background-color: var(--card);
+    border-bottom: 3px solid var(--roxo-escuro);
+}
+
+.navbar-conteudo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+
+.logo {
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--texto);
+    text-decoration: none;
+}
+
+.menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.menu a {
+    color: var(--texto-suave);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
+.menu a:hover {
+    color: var(--texto);
+    background-color: var(--card-claro);
+}
+
+.menu a.ativo {
+    color: var(--texto);
+    background-color: var(--roxo-escuro);
+}
+
+.rodape {
+    text-align: center;
+    color: var(--texto-suave);
+    font-size: 0.9rem;
+    border-top: 1px solid var(--borda);
+    padding: 16px;
+}
+
+.rodape p {
+    margin: 0;
+}
+
+.hero {
+    background-color: var(--card);
+    border: 1px solid var(--borda);
+    border-left: 6px solid var(--roxo);
+    border-radius: 10px;
+    padding: 40px;
+    margin-bottom: 16px;
+}
+
+.hero h1 {
+    font-size: 3rem;
+    margin-bottom: 4px;
+}
+
+.hero-subtitulo {
+    font-size: 1.3rem;
+    color: var(--roxo);
+    font-weight: 600;
+    margin: 0;
+}
+
+.hero-texto {
+    color: var(--texto-suave);
+    margin-bottom: 0;
+}
+
+.cabecalho-pagina {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.cabecalho-pagina h1 {
+    margin-bottom: 0;
+}
+
+.grade-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.card-capa {
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #2b2560;
+}
+
+.card-capa span {
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 4rem;
+    font-weight: 700;
+    color: var(--roxo);
+}
+
+.card:nth-child(3n+2) .card-capa {
+    background-color: #1d3550;
+}
+
+.card:nth-child(3n+2) .card-capa span {
+    color: var(--azul);
+}
+
+.card:nth-child(3n+3) .card-capa {
+    background-color: #1c4038;
+}
+
+.card:nth-child(3n+3) .card-capa span {
+    color: var(--verde);
+}
+
+.card-corpo {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 16px;
+}
+
+.card-corpo h3 {
+    font-size: 1.25rem;
+    margin-bottom: 6px;
+}
+
+.card-info {
+    color: var(--texto-suave);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.card-rodape {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 14px;
+}
+
+.preco {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0;
+}
+
+.tag {
+    background-color: var(--card-claro);
+    color: var(--texto);
+    border: 1px solid var(--borda);
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 0.85rem;
+}
+
+.link-voltar {
+    color: var(--texto-suave);
+}
+
+.detalhe {
+    background-color: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 32px;
+}
+
+.detalhe-info {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 20px 0 0;
+}
+
+.detalhe-info div {
+    background-color: var(--card-claro);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.detalhe-info dt {
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+}
+
+.detalhe-info dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.descricao {
+    max-width: 70ch;
+}
+
+.avaliacoes {
+    margin-top: 16px;
+}
+
+.avaliacao {
+    background-color: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+}
+
+.avaliacao-topo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.avaliacao p {
+    margin: 8px 0 0;
+}
+
+.avaliacao-data {
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+}
+
+.nota {
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--fundo);
+}
+
+.nota-1, .nota-2 {
+    background-color: var(--vermelho);
+}
+
+.nota-3 {
+    background-color: var(--amarelo);
+}
+
+.nota-4, .nota-5 {
+    background-color: var(--verde);
+}
+
+.caixa-formulario {
+    max-width: 640px;
+    margin: 0 auto;
+    background-color: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 32px;
+}
+
+.formulario > div {
+    margin-bottom: 18px;
+}
+
+.formulario label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.formulario input,
+.formulario select,
+.formulario textarea {
+    width: 100%;
+    background-color: var(--fundo);
+    color: var(--texto);
+    border: 1px solid var(--borda);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.formulario textarea {
+    height: 140px;
+    resize: vertical;
+}
+
+.formulario fieldset {
+    border: 1px solid var(--borda);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 0;
+}
+
+.formulario legend {
+    font-weight: 600;
+    padding: 0 6px;
+}
+
+.formulario fieldset > div {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.formulario fieldset label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 400;
+    margin: 4px 0;
+    cursor: pointer;
+}
+
+.formulario input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--roxo);
+}
+
+.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 6px;
+    color: #ff8a8e;
+    font-size: 0.9rem;
+}
+
+.caixa-perigo {
+    border-top: 4px solid var(--vermelho);
+}
+
+.aviso {
+    color: #ff8a8e;
+}
+
+
+@media (max-width: 800px) {
+    .detalhe-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.8rem;
+    }
+
+    .hero {
+        padding: 24px;
+    }
+
+    .hero h1 {
+        font-size: 2.3rem;
+    }
+
+    .detalhe,
+    .caixa-formulario {
+        padding: 20px;
+    }
+
+    .detalhe-info {
+        grid-template-columns: 1fr;
+    }
+
+    .botoes .botao {
+        flex: 1 1 auto;
+        text-align: center;
+    }
+}

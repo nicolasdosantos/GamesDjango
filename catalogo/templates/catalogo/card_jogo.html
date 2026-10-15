@@ -1,0 +1,22 @@
+<article class="card">
+    <div class="card-capa">
+        <span>{{ jogo.titulo|first|upper }}</span>
+    </div>
+
+    <div class="card-corpo">
+        <h3>{{ jogo.titulo }}</h3>
+        <p class="card-info">{{ jogo.desenvolvedora }} - {{ jogo.ano_lancamento }}</p>
+        <p class="card-info">Plataforma: {{ jogo.plataforma }}</p>
+
+        <div class="tags">
+            {% for categoria in jogo.categorias.all %}
+            <span class="tag">{{ categoria.nome }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="card-rodape">
+            <span class="preco">{% if jogo.preco %}R$ {{ jogo.preco }}{% else %}Gratuito{% endif %}</span>
+            <a href="{% url 'detalhe_jogo' jogo.id %}" class="botao botao-pequeno">Ver detalhes</a>
+        </div>
+    </div>
+</article>

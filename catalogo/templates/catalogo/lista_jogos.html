@@ -1,0 +1,20 @@
+{% extends 'catalogo/base.html' %}
+
+{% block titulo %}Jogos - GameDex{% endblock %}
+
+{% block conteudo %}
+<div class="cabecalho-pagina">
+    <h1>Jogos</h1>
+    <a href="{% url 'novo_jogo' %}" class="botao">Cadastrar jogo</a>
+</div>
+
+{% if jogos %}
+<div class="grade-cards">
+    {% for jogo in jogos %}
+        {% include 'catalogo/card_jogo.html' %}
+    {% endfor %}
+</div>
+{% else %}
+<p class="vazio">Nenhum jogo cadastrado ainda.</p>
+{% endif %}
+{% endblock %}
