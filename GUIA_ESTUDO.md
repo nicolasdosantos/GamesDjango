@@ -4,10 +4,10 @@ Catálogo de jogos feito em Django pra atividade da faculdade. O site lista jogo
 
 - **Projeto:** `gamedex` (configurações gerais)
 - **App:** `catalogo` (onde fica tudo do catálogo)
-- **Banco:** SQLite (`db.sqlite3`)
+- **Banco:** MySQL (banco `gamedex`, criado pelo `banco/gamedex.sql`). O SQLite (`db.sqlite3`) continua no projeto como alternativa.
 - **Front-end:** templates do Django + um arquivo CSS
 
-Pra rodar: `./venv/bin/python manage.py runserver` e abrir http://127.0.0.1:8000/
+Pra rodar: siga o `README.md` (instalar, rodar o script do banco, `python manage.py runserver`) e abra http://127.0.0.1:8000/
 
 ---
 
@@ -26,7 +26,7 @@ catalogo/urls.py     → 'jogos/<int:id>/' bate, id = 5 → chama views.detalhe_
       │
       ▼
 catalogo/views.py    → get_object_or_404(Jogo, id=5) e jogo.avaliacoes.all()
-      │                 (o ORM transforma isso em SQL e busca no db.sqlite3)
+      │                 (o ORM transforma isso em SQL e busca no MySQL)
       ▼
 catalogo/models.py   → define como são as tabelas Jogo, Avaliacao etc.
       │
@@ -92,7 +92,7 @@ Liga cada URL a uma view e dá um `name` pra ela. Esse name é usado no `{% url 
 É o primeiro urls.py que o Django lê (por causa do `ROOT_URLCONF`). Manda `admin/` pro painel e todo o resto pro `catalogo/urls.py` com `include`.
 
 ### `gamedex/settings.py` – configurações
-As mais importantes: `INSTALLED_APPS` (o `catalogo` está lá), `DATABASES` (SQLite), `TEMPLATES` (`APP_DIRS=True` faz o Django achar `catalogo/templates/`), `STATIC_URL`, `LANGUAGE_CODE='pt-br'`, `TIME_ZONE`, `DEBUG` e `SECRET_KEY`. Também tem o `MIDDLEWARE`: as camadas que todo pedido atravessa antes da view. Uma delas, o `CsrfViewMiddleware`, é quem confere o `{% csrf_token %}`. Tem ainda `ALLOWED_HOSTS`, `BASE_DIR`, `USE_TZ` e `WSGI_APPLICATION`.
+As mais importantes: `INSTALLED_APPS` (o `catalogo` está lá), `DATABASES` (MySQL, com o SQLite comentado logo acima), `TEMPLATES` (`APP_DIRS=True` faz o Django achar `catalogo/templates/`), `STATIC_URL`, `LANGUAGE_CODE='pt-br'`, `TIME_ZONE`, `DEBUG` e `SECRET_KEY`. Também tem o `MIDDLEWARE`: as camadas que todo pedido atravessa antes da view. Uma delas, o `CsrfViewMiddleware`, é quem confere o `{% csrf_token %}`. Tem ainda `ALLOWED_HOSTS`, `BASE_DIR`, `USE_TZ` e `WSGI_APPLICATION`.
 
 ### Templates (`catalogo/templates/catalogo/`)
 - **base.html** – o molde de todas as páginas: head, CSS, menu e rodapé. Tem os blocks `titulo` e `conteudo`. Marca no menu o link da página atual.
@@ -126,11 +126,13 @@ São arquivos que o `startproject`/`startapp` criaram (ou que o Django gerou) e 
 | `gamedex/asgi.py` | Mesma ideia, só que pra servidores ASGI (assíncronos, que aguentam websockets). **Não é usado** neste projeto. |
 | `catalogo/apps.py` | Configuração do app (`CatalogoConfig`). O `'catalogo'` no `INSTALLED_APPS` aponta pra ela. |
 | `catalogo/tests.py` | Lugar dos testes automáticos (`TestCase`, rodam com `manage.py test` num banco separado). **Está vazio**: o projeto não tem testes automáticos e foi testado na mão pelo navegador. |
-| `__init__.py` (em `gamedex/`, `catalogo/` e `migrations/`) | Arquivos vazios que transformam a pasta num pacote Python, aí dá pra importar `gamedex.settings`, `catalogo.urls` etc. Sem o de `migrations/`, o Django acha que o app não tem migrations. |
-| `requirements.txt` | Lista dos pacotes e versões que o projeto precisa: Django 6.1.2, mais `asgiref` e `sqlparse`, que vêm junto como dependências do Django. Num computador novo: criar a venv e rodar `pip install -r requirements.txt`. |
+| `__init__.py` (em `gamedex/`, `catalogo/` e `migrations/`) | Transformam a pasta num pacote Python, aí dá pra importar `gamedex.settings`, `catalogo.urls` etc. Sem o de `migrations/`, o Django acha que o app não tem migrations. Os de `catalogo/` e `migrations/` estão vazios. O de `gamedex/` tem o `pymysql.install_as_MySQLdb()`, porque ele roda antes de tudo (ver seção 5). |
+| `requirements.txt` | Lista dos pacotes e versões que o projeto precisa: Django 6.1.2, PyMySQL (conexão com o MySQL) e `cryptography` (login no MySQL 8 com senha). `asgiref`, `sqlparse`, `cffi` e `pycparser` vêm junto como dependências. Num computador novo: criar a venv e rodar `pip install -r requirements.txt`. |
+| `banco/gamedex.sql` | Script que cria o banco MySQL inteiro: banco, usuário, tabelas, migrations aplicadas e dados de exemplo (ver seção 5). |
+| `README.md` | Passo a passo pra rodar o projeto em outro computador (Windows e Linux) e a seção "Deu erro?". |
 | `venv/` | Ambiente virtual: uma pasta com um Python e os pacotes só deste projeto, pra não misturar com os de outros projetos. |
 | `.gitignore` | Lista do que o Git não deve guardar: `venv/`, `__pycache__/`, `*.pyc` e configurações do editor. O `db.sqlite3` foi guardado de propósito, pra ir com os dados de exemplo. |
-| `db.sqlite3` | O banco de dados inteiro num arquivo só. |
+| `db.sqlite3` | O banco SQLite inteiro num arquivo só. Hoje o projeto usa MySQL, mas ele continua aqui (com os dados antigos) pra quem quiser voltar pro SQLite. |
 
 ### As migrations (`catalogo/migrations/`)
 
@@ -173,7 +175,46 @@ Na primeira rodada de comentários, 5 explicações estavam erradas ou imprecisa
 
 ---
 
-## 5. Perguntas que o professor pode fazer
+## 5. O banco de dados: SQLite e MySQL
+
+### Qual a diferença?
+| | SQLite | MySQL / MariaDB |
+|---|---|---|
+| Onde fica | Um arquivo (`db.sqlite3`) | Um servidor separado, que precisa estar instalado e ligado |
+| Como o Django conecta | Abre o arquivo direto | Pela rede: host + porta + usuário + senha |
+| Instalação | Nenhuma, já vem com o Python | Instalar o servidor + uma biblioteca de conexão (PyMySQL) |
+| Usuários e permissões | Não tem | Tem (o projeto usa o usuário `gamedex`) |
+| Pra que serve | Desenvolvimento, projetos pequenos | Sites de verdade, vários acessos ao mesmo tempo |
+
+**O que mudou no código pra trocar de banco:** só o `DATABASES` do `settings.py`, o `requirements.txt` e duas linhas no `gamedex/__init__.py`. Models, views, forms e templates ficaram iguais, porque o ORM gera o SQL certo pra cada banco. Essa é a grande vantagem de usar o ORM em vez de escrever SQL na mão.
+
+### PyMySQL
+O Django conecta no MySQL usando uma biblioteca chamada `MySQLdb` (pacote `mysqlclient`). Esse pacote às vezes precisa de compilador pra instalar, principalmente no Windows. O PyMySQL é feito só em Python e instala sem problema. O `pymysql.install_as_MySQLdb()` no `gamedex/__init__.py` registra o PyMySQL com o nome `MySQLdb`, e o Django usa ele sem perceber a troca. O `cryptography` é necessário porque o MySQL 8 usa um tipo de login (`caching_sha2_password`) que precisa de criptografia quando o usuário tem senha.
+
+### Usuário próprio do projeto
+O script cria o usuário `gamedex` (senha `Gamedex@2026`) com permissão **só no banco gamedex** (`GRANT ALL PRIVILEGES ON gamedex.*`). Isso é o "princípio do menor privilégio": o projeto só pode mexer no que precisa. Se a senha vazar, os outros bancos do MySQL ficam protegidos. E como o usuário é igual em todo computador, o `settings.py` não precisa ser editado. O usuário é criado 3 vezes (`'localhost'`, `'127.0.0.1'` e `'::1'`) porque, dependendo da configuração, o MySQL identifica uma conexão local por um desses nomes.
+
+### O que o `banco/gamedex.sql` faz
+1. `DROP DATABASE IF EXISTS` + `CREATE DATABASE ... utf8mb4`: recria o banco do zero, por isso dá pra rodar o script várias vezes.
+2. `CREATE USER IF NOT EXISTS` + `ALTER USER` + `GRANT`: cria o usuário (sem erro se já existir), garante a senha e dá a permissão.
+3. `CREATE TABLE` das 16 tabelas: 10 internas do Django (auth, admin, contenttypes, sessions, django_migrations) e 6 do catálogo, incluindo a `catalogo_jogo_categorias` do ManyToMany.
+4. `INSERT` na `django_migrations`, na `django_content_type` e na `auth_permission`.
+5. `INSERT` dos dados de exemplo e do superusuário `admin` / `admin123`.
+
+**Como ele foi feito:** em vez de escrever as tabelas na mão, rodei o `migrate` num MySQL 8.4 limpo, gravei os dados de exemplo pelo próprio Django e exportei com o `mysqldump`. Assim as tabelas são exatamente as que as migrations criam. Ele foi testado em MySQL 8.4, MariaDB 11.8 e MariaDB 10.11.
+
+### A tabela `django_migrations`
+É onde o Django anota quais migrations já foram aplicadas (colunas `app`, `name` e `applied`). O `migrate` **não olha as tabelas**: ele só compara a lista de arquivos de migration com essa tabela e roda o que estiver faltando. Como o script já insere as 22 linhas (as 18 migrations do Django e as 4 do catálogo), depois dele o `migrate` responde `No migrations to apply`. Se essa tabela estivesse vazia, o `migrate` tentaria criar tabelas que já existem e daria erro "Table already exists".
+
+### Cuidado: o MySQL compara texto diferente do SQLite
+A collation `utf8mb4_unicode_ci` ignora **maiúsculas e acentos** nas comparações. Então, no MySQL, uma categoria "Acao" é considerada igual a "Ação", e o `unique=True` do nome recusa a segunda. No SQLite isso passava. O mesmo vale pras buscas: um `filter(nome='rpg')` acha "RPG".
+
+### Senha do admin
+O `auth_user` não guarda a senha `admin123`. Ele guarda um **hash**: `pbkdf2_sha256$<iterações>$<salt>$<hash>`, gerado pelo `make_password` do Django. O hash não dá pra "desfazer". No login, o Django gera o hash do que foi digitado, com o mesmo salt, e compara os dois.
+
+---
+
+## 6. Perguntas que o professor pode fazer
 
 **1. O que é o padrão MVT do Django?**
 Model (dados/banco), View (lógica) e Template (HTML). No projeto: `models.py`, `views.py` e a pasta `templates/`. O `urls.py` liga a URL à view.
@@ -264,3 +305,27 @@ O `tests.py` está vazio, então não tem testes automáticos. Testei na mão: c
 
 **30. Pra que servem a venv e o `requirements.txt`?**
 A venv é um Python separado só pra este projeto, pra versão do Django não brigar com a de outros projetos. O `requirements.txt` lista os pacotes e versões, e com `pip install -r requirements.txt` qualquer pessoa instala tudo igual.
+
+**31. O que você precisou mudar no código pra trocar o SQLite pelo MySQL?**
+Só a configuração: o `DATABASES` no `settings.py`, o PyMySQL no `requirements.txt` e o `install_as_MySQLdb()` no `gamedex/__init__.py`. Models, views e templates não mudaram, porque o ORM gera o SQL de cada banco.
+
+**32. Por que PyMySQL e não mysqlclient?**
+O mysqlclient é o recomendado pelo Django, mas às vezes precisa de compilador pra instalar. O PyMySQL é só Python, instala em qualquer computador, e o `install_as_MySQLdb()` faz o Django usar ele no lugar.
+
+**33. Por que o projeto tem um usuário próprio no MySQL em vez de usar o root?**
+Pelo princípio do menor privilégio: o usuário `gamedex` só tem permissão no banco `gamedex`. Além disso, o root tem uma senha diferente em cada computador, e o `gamedex` é igual em todos, então o `settings.py` funciona sem editar.
+
+**34. Depois de rodar o script, por que o `migrate` não tenta criar as tabelas de novo?**
+Porque o script preenche a tabela `django_migrations` com todas as migrations. O `migrate` só olha essa tabela pra decidir o que rodar, então responde "No migrations to apply".
+
+**35. Como esse script foi feito? Você escreveu as tabelas na mão?**
+Não. Rodei o `migrate` num MySQL limpo, inseri os dados pelo Django e exportei com o `mysqldump`. Assim as tabelas são idênticas às que as migrations criam. Depois só organizei e comentei o arquivo.
+
+**36. O que é utf8mb4 e o que é collation?**
+utf8mb4 é o UTF-8 completo do MySQL (acentos, ç, emoji). A collation é a regra de comparar e ordenar texto. A `utf8mb4_unicode_ci` ignora maiúsculas e acentos, então "Ação" e "acao" contam como iguais.
+
+**37. Como a senha do admin fica guardada no banco?**
+Como hash `pbkdf2_sha256`, gerado pelo `make_password`. Não dá pra descobrir a senha olhando o banco. No login, o Django gera o hash da senha digitada e compara.
+
+**38. Se eu mudar um model agora, o que acontece com o script?**
+O fluxo normal continua: `makemigrations` e `migrate`, que funcionam com o usuário `gamedex` porque ele tem permissão de alterar tabelas no banco. Só que o `gamedex.sql` fica desatualizado e precisa ser gerado de novo pra quem for instalar o projeto do zero.

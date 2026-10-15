@@ -15,7 +15,7 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR é a pasta raiz do projeto (onde fica o manage.py). Path(__file__) é este settings.py,
 # e os dois .parent sobem duas pastas: primeiro pra gamedex/ e depois pra raiz.
-# Uso ele pra montar caminhos que funcionam em qualquer computador, tipo o do banco lá embaixo.
+# Uso ele pra montar caminhos que funcionam em qualquer computador, tipo o do arquivo do SQLite lá embaixo.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -114,13 +114,41 @@ WSGI_APPLICATION = 'gamedex.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 # DATABASES diz qual banco de dados o projeto usa.
-# Usei o SQLite, que já vem com o Python e guarda tudo num arquivo só (db.sqlite3 na raiz do projeto).
-# Não precisa instalar nem ligar servidor de banco, então é o mais simples pra um projeto da faculdade.
-# BASE_DIR é a pasta raiz do projeto (definida lá em cima).
+
+# --- SQLite (o banco que o projeto usava antes) ---
+# O SQLite já vem com o Python e guarda tudo num arquivo só (db.sqlite3 na raiz do projeto),
+# sem precisar instalar nem ligar servidor de banco. BASE_DIR é a pasta raiz (definida lá em cima).
+# PRA VOLTAR PRO SQLITE: tire o "#" das 6 linhas abaixo e coloque "#" no bloco do MySQL mais embaixo.
+# O db.sqlite3 continua no projeto com os dados antigos, então não precisa rodar nenhum script.
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+# --- MySQL (o banco que o projeto usa agora) ---
+# Ao contrário do SQLite, o MySQL é um servidor separado: precisa estar instalado e ligado,
+# e o Django conecta nele por rede (host + porta) com usuário e senha.
+# O banco "gamedex" e o usuário "gamedex" são criados pelo script banco/gamedex.sql.
+# Criei um usuário só do projeto em vez de usar o root porque ele só tem permissão no banco gamedex:
+# se a senha vazar, ninguém mexe nos outros bancos do MySQL. E o root de cada computador tem uma
+# senha diferente, enquanto este usuário é igual em todo lugar, então o projeto conecta sem editar nada.
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        # Diz pro Django usar o "tradutor" de MySQL (o ORM gera SQL do jeito que o MySQL entende).
+        # A conexão em si é feita pela biblioteca PyMySQL (ver gamedex/__init__.py).
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'gamedex',           # nome do banco dentro do MySQL
+        'USER': 'gamedex',           # usuário criado pelo script
+        'PASSWORD': 'Gamedex@2026',  # senha com maiúscula, número e símbolo, pra passar na política de senha do MySQL
+        'HOST': 'localhost',         # o MySQL está no mesmo computador
+        'PORT': '3306',              # porta padrão do MySQL
+        'OPTIONS': {
+            # utf8mb4 é o UTF-8 "completo" do MySQL: aceita acentos, ç e até emoji.
+            # O Django já usa ele por padrão, mas deixei escrito pra ficar claro.
+            'charset': 'utf8mb4',
+        },
     }
 }
 
