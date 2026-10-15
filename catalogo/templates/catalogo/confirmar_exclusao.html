@@ -1,4 +1,9 @@
 {% extends 'catalogo/base.html' %}
+{% comment %}
+    confirmar_exclusao.html: página "tem certeza?" antes de apagar um jogo.
+    É renderizada pela view excluir_jogo quando o pedido é GET. Recebe a variável "jogo".
+    O extends tem que ser a primeira tag do arquivo, por isso este comentário fica depois dele.
+{% endcomment %}
 
 {% block titulo %}Excluir {{ jogo.titulo }} - GameDex{% endblock %}
 
@@ -7,9 +12,19 @@
     <h1>Excluir jogo</h1>
 
     <p>Tem certeza que deseja excluir <strong>{{ jogo.titulo }}</strong>?</p>
+    {# aviso porque as avaliações têm on_delete=CASCADE no model e vão embora junto com o jogo #}
     <p class="aviso">Essa ação também removerá as avaliações relacionadas.</p>
 
+    {% comment %}
+        O formulário não tem action, então ele envia pra mesma URL (/jogos/<id>/excluir/).
+        Aí a view recebe um POST e apaga o jogo. Apagar só pelo POST evita que um link apague coisa sem querer.
+    {% endcomment %}
     <form method="post">
+        {% comment %}
+            csrf_token cria um campo escondido com um código secreto. O Django confere esse código
+            em todo POST e recusa (erro 403) se ele não vier. Isso impede outro site de mandar
+            um formulário falso pro meu, usando o navegador da pessoa, pra apagar um jogo sem ela saber.
+        {% endcomment %}
         {% csrf_token %}
         <div class="botoes">
             <a href="{% url 'detalhe_jogo' jogo.id %}" class="botao botao-secundario">Cancelar</a>

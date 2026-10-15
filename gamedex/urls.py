@@ -15,9 +15,17 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+# include() serve pra "puxar" a lista de URLs de outro arquivo (no caso, o urls.py do app catalogo).
 from django.urls import include, path
 
+# Este é o urls.py PRINCIPAL do projeto. O settings.py aponta pra ele no ROOT_URLCONF,
+# então é por aqui que todo pedido começa.
+# Eu deixo aqui só as URLs gerais e mando o resto pro app. Assim cada app cuida das próprias URLs
+# e este arquivo fica pequeno.
 urlpatterns = [
+    # "/admin/" -> painel de administração pronto do Django (os models aparecem lá por causa do admin.py)
     path('admin/', admin.site.urls),
+    # '' (a raiz do site) -> manda pro catalogo/urls.py. O que sobrar do endereço
+    # (ex: "jogos/5/") é procurado na lista de lá.
     path('', include('catalogo.urls')),
 ]

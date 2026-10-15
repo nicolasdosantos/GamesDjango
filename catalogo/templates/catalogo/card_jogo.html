@@ -1,21 +1,33 @@
+{% comment %}
+    card_jogo.html: o "cartão" de um jogo, usado na página inicial e na lista de jogos.
+    Ele não é uma página inteira e não tem extends. É um pedaço de HTML que as outras páginas
+    puxam com {% include 'catalogo/card_jogo.html' %} dentro de um for.
+    O include enxerga as variáveis de quem chamou, por isso aqui eu uso "jogo" direto
+    (é a variável do {% for jogo in ... %}). Assim o card fica escrito num lugar só.
+{% endcomment %}
 <article class="card">
     <div class="card-capa">
+        {# como não tem imagem do jogo, a capa mostra a primeira letra do título em maiúscula. first e upper são filtros: o | aplica uma transformação no valor #}
         <span>{{ jogo.titulo|first|upper }}</span>
     </div>
 
     <div class="card-corpo">
         <h3>{{ jogo.titulo }}</h3>
+        {# {{ jogo.desenvolvedora }} mostra o __str__ da Desenvolvedora, que é o nome #}
         <p class="card-info">{{ jogo.desenvolvedora }} - {{ jogo.ano_lancamento }}</p>
         <p class="card-info">Plataforma: {{ jogo.plataforma }}</p>
 
         <div class="tags">
+            {# categorias é ManyToMany, então preciso do .all pra pegar a lista. No template não tem parênteses: é .all e não .all() #}
             {% for categoria in jogo.categorias.all %}
             <span class="tag">{{ categoria.nome }}</span>
             {% endfor %}
         </div>
 
         <div class="card-rodape">
+            {# preço 0 conta como "falso" no if, então jogo com preço 0 aparece como "Gratuito" #}
             <span class="preco">{% if jogo.preco %}R$ {{ jogo.preco }}{% else %}Gratuito{% endif %}</span>
+            {# {% url 'detalhe_jogo' jogo.id %} passa o id pro <int:id> da URL e vira /jogos/<id>/ #}
             <a href="{% url 'detalhe_jogo' jogo.id %}" class="botao botao-pequeno">Ver detalhes</a>
         </div>
     </div>

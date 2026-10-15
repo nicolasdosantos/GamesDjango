@@ -1,4 +1,9 @@
 {% extends 'catalogo/base.html' %}
+{% comment %}
+    form_avaliacao.html: formulário pra avaliar um jogo.
+    É renderizado pela view avaliar_jogo, que manda o "form" (AvaliacaoForm) e o "jogo".
+    O jogo vem junto só pra mostrar o nome dele no título e montar o link de cancelar.
+{% endcomment %}
 
 {% block titulo %}Avaliar {{ jogo.titulo }} - GameDex{% endblock %}
 
@@ -6,8 +11,15 @@
 <section class="caixa-formulario">
     <h1>Avaliar {{ jogo.titulo }}</h1>
 
+    {# sem action: envia o POST pra mesma URL (/jogos/<id>/avaliar/), e é por ela que a view sabe de qual jogo é a avaliação #}
     <form method="post" class="formulario">
+        {# obrigatório em todo form com POST, senão o Django recusa com erro 403 #}
         {% csrf_token %}
+        {% comment %}
+            form.as_div desenha todos os campos do formulário, cada um dentro de uma <div>,
+            com o label, o campo e as mensagens de erro quando o is_valid() falha.
+            Assim eu não preciso escrever o HTML de cada campo na mão.
+        {% endcomment %}
         {{ form.as_div }}
 
         <div class="botoes">

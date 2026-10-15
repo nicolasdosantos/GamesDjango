@@ -1,4 +1,8 @@
 {% extends 'catalogo/base.html' %}
+{% comment %}
+    lista_jogos.html: mostra todos os jogos em cards.
+    É renderizada pela view lista_jogos, que manda a variável "jogos" já em ordem alfabética.
+{% endcomment %}
 
 {% block titulo %}Jogos - GameDex{% endblock %}
 
@@ -8,9 +12,11 @@
     <a href="{% url 'novo_jogo' %}" class="botao">Cadastrar jogo</a>
 </div>
 
+{# se não tiver jogo nenhum, mostra uma mensagem em vez de uma área vazia #}
 {% if jogos %}
 <div class="grade-cards">
     {% for jogo in jogos %}
+        {# o mesmo card da página inicial. Por causa do include só existe um card_jogo.html pros dois lugares #}
         {% include 'catalogo/card_jogo.html' %}
     {% endfor %}
 </div>

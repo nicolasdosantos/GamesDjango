@@ -1,26 +1,62 @@
 {% load static %}
+{% comment %}
+    base.html: o "molde" de todas as páginas do site.
+    Ele tem o que se repete em todo lugar (head, menu, rodapé) e deixa "buracos" chamados blocks.
+    As outras páginas começam com {% extends 'catalogo/base.html' %} e só preenchem esses blocks.
+    Isso é a herança de templates: se eu mudar o menu aqui, ele muda em todas as páginas.
+    Nenhuma view renderiza este arquivo direto, ele sempre vem por meio de um extends.
+
+    Na linguagem de templates do Django tem dois tipos de marcação:
+    - {{ variavel }} MOSTRA um valor na página (ex: {{ jogo.titulo }}). Pode ter filtro com |, tipo {{ jogo.titulo|upper }}.
+    - {% tag %} faz uma AÇÃO ou lógica: if, for, url, block, extends, include... e não mostra nada sozinha.
+    O {{ }} também faz "autoescape": se alguém digitar <script> num campo, o Django troca o < e o >
+    por códigos (&lt; &gt;), e aí aparece como texto em vez de rodar como código. Isso protege contra XSS
+    (quando alguém tenta colocar código malicioso na página dos outros).
+
+    O {% load static %} lá em cima carrega a tag {% static %}, que eu uso pra montar o endereço do CSS.
+    Os comentários com {# #} e {% comment %} não aparecem no código-fonte da página, por isso não usei <!-- -->.
+{% endcomment %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    {# viewport faz o site se ajustar à largura da tela no celular #}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# block titulo: cada página pode trocar o título da aba. Se não trocar, fica "GameDex" #}
     <title>{% block titulo %}GameDex{% endblock %}</title>
 
+    {# fonte Chakra Petch do Google Fonts, usada nos títulos. Os preconnect só deixam o carregamento mais rápido #}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
+    {% comment %}
+        {% static %} monta o endereço do arquivo usando o STATIC_URL do settings.py,
+        então aqui vira "/static/catalogo/css/style.css". Uso a tag e não o caminho escrito na mão
+        porque, se o STATIC_URL mudar, o link continua certo.
+    {% endcomment %}
     <link rel="stylesheet" href="{% static 'catalogo/css/style.css' %}">
 </head>
 <body>
+    {% comment %}
+        request.resolver_match.url_name é o name da URL da página atual (ex: 'lista_jogos').
+        Guardo isso na variável "pagina" com o {% with %} pra não repetir esse caminho comprido em cada link.
+        Com ela eu coloco a classe "ativo" no link da página onde a pessoa está, e ele fica destacado no menu.
+        O request só existe aqui por causa do context processor 'request' que está no settings.py.
+    {% endcomment %}
     {% with pagina=request.resolver_match.url_name %}
     <header class="navbar">
         <div class="container navbar-conteudo">
+            {% comment %}
+                {% url 'inicio' %} monta o endereço pelo name que está no urls.py.
+                Assim eu não escrevo "/" ou "/jogos/" na mão, e se a URL mudar o link se ajusta sozinho.
+            {% endcomment %}
             <a href="{% url 'inicio' %}" class="logo">GameDex</a>
 
             <nav class="menu">
                 <a href="{% url 'inicio' %}" {% if pagina == 'inicio' %}class="ativo"{% endif %}>Início</a>
                 <a href="{% url 'lista_jogos' %}" {% if pagina == 'lista_jogos' %}class="ativo"{% endif %}>Jogos</a>
                 <a href="{% url 'novo_jogo' %}" {% if pagina == 'novo_jogo' %}class="ativo"{% endif %}>Cadastrar jogo</a>
+                {# 'admin:index' tem "admin:" na frente porque as URLs do admin ficam num namespace (um grupo de nomes) chamado admin #}
                 <a href="{% url 'admin:index' %}">Admin</a>
             </nav>
         </div>
@@ -28,6 +64,7 @@
     {% endwith %}
 
     <main class="container conteudo">
+        {# block conteudo: aqui entra o conteúdo de cada página (lista, detalhe, formulário...) #}
         {% block conteudo %}{% endblock %}
     </main>
 

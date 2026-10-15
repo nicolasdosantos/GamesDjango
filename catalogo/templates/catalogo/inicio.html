@@ -1,6 +1,12 @@
 {% extends 'catalogo/base.html' %}
+{% comment %}
+    inicio.html: a página inicial do site ("/").
+    É renderizada pela view inicio, que manda a variável "destaques" (os 3 últimos jogos cadastrados).
+    Não preenchi o block titulo, então a aba fica com o título padrão do base.html ("GameDex").
+{% endcomment %}
 
 {% block conteudo %}
+{# "hero" é o nome comum pra aquela faixa grande de apresentação no topo da página #}
 <section class="hero">
     <h1>GameDex</h1>
     <p class="hero-subtitulo">Seu catálogo de jogos</p>
@@ -15,9 +21,11 @@
 <section>
     <h2>Últimos jogos cadastrados</h2>
 
+    {# QuerySet vazio conta como falso no if, então se não tiver nenhum jogo cai no else #}
     {% if destaques %}
     <div class="grade-cards">
         {% for jogo in destaques %}
+            {# include puxa o card pronto. Ele usa a variável "jogo" deste for #}
             {% include 'catalogo/card_jogo.html' %}
         {% endfor %}
     </div>
