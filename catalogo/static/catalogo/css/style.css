@@ -604,23 +604,79 @@ textarea:focus-visible {
     background-color: var(--card-claro);
 }
 
-/* Filtros da lista de jogos. O form.as_div gera uma div por campo, e o grid coloca
-   os campos lado a lado (quantos couberem na linha, com no mínimo 180px cada). */
+/* Filtros da lista de jogos: uma caixa com a busca grande em cima e os outros filtros numa grade.
+   A grade coloca os campos lado a lado (quantos couberem na linha, com no mínimo 170px cada). */
 .filtros {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0 16px;
     background-color: var(--card);
     border: 1px solid var(--borda);
     border-top: 3px solid var(--roxo);
     border-radius: 14px;
-    padding: 20px 20px 4px;
+    padding: 20px;
     margin-bottom: 16px;
 }
 
-/* a div dos botões ocupa a linha inteira do grid (do começo até o fim, 1 / -1) */
+.filtros .filtro-busca input {
+    font-size: 1.1rem;
+    padding: 12px 14px;
+}
+
+.filtros-grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0 16px;
+}
+
+.filtros-grade > div {
+    margin-bottom: 14px;
+}
+
 .filtros .botoes {
-    grid-column: 1 / -1;
+    margin-top: 4px;
+}
+
+/* aviso quando algum filtro foi ignorado por ter valor inválido */
+.aviso-filtro {
+    color: var(--amarelo);
+    background-color: rgba(245, 215, 110, 0.08);
+    border: 1px solid rgba(245, 215, 110, 0.35);
+    border-radius: 8px;
+    padding: 10px 14px;
+}
+
+/* Paginação embaixo dos cards */
+.paginacao {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 28px;
+}
+
+.pagina,
+.pagina-atual {
+    min-width: 38px;
+    text-align: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--borda);
+    text-decoration: none;
+}
+
+.pagina {
+    color: var(--texto-suave);
+}
+
+.pagina:hover {
+    color: var(--menta);
+    border-color: var(--menta);
+}
+
+.pagina-atual {
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--roxo), var(--roxo-escuro));
+    border-color: transparent;
+    box-shadow: 0 0 12px var(--brilho-roxo);
 }
 
 .resultado-busca {

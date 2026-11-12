@@ -32,7 +32,7 @@ Dá para pesquisar jogos com filtros, criar uma conta, avaliar com nota de 1 a 5
 ## ✨ Funcionalidades
 
 - **Página inicial** com os últimos jogos cadastrados
-- **Lista de jogos com filtros de pesquisa**: título, categoria, plataforma, desenvolvedora e preço máximo
+- **Lista de jogos com filtros de pesquisa**: busca por título ou desenvolvedora, categoria, plataforma, faixa de preço, ano, nota média, ordenação e paginação
 - **Detalhes do jogo**: desenvolvedora, plataforma, categorias, preço e avaliações
 - **CRUD de jogos** (só admin): cadastrar, editar e excluir, com página de confirmação
 - **Contas de usuário**: criar conta, entrar e sair
@@ -147,7 +147,7 @@ erDiagram
 | URL | Página | Acesso |
 |---|---|---|
 | `/` | Início | todos |
-| `/jogos/` | Lista de jogos com filtros (ex.: `/jogos/?titulo=zelda&preco_max=300`) | todos |
+| `/jogos/` | Lista de jogos com filtros (ex.: `/jogos/?busca=zelda&preco_max=300`) | todos |
 | `/jogos/<id>/` | Detalhes do jogo | todos |
 | `/jogos/novo/` | Cadastrar jogo | admin |
 | `/jogos/<id>/editar/` | Editar jogo | admin |
@@ -299,7 +299,7 @@ Com a venv ativada e o MySQL ligado:
 python manage.py test catalogo
 ```
 
-São 12 testes (`catalogo/tests.py`) que conferem os níveis de acesso, o cadastro com perfil e os filtros. O Django cria um banco separado (`test_gamedex`) só para os testes e apaga no final, então os dados do site não são alterados.
+São 22 testes (`catalogo/tests.py`) que conferem os níveis de acesso, o cadastro com perfil e os filtros. O Django cria um banco separado (`test_gamedex`) só para os testes e apaga no final, então os dados do site não são alterados.
 
 ---
 

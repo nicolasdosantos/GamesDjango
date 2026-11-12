@@ -1,9 +1,10 @@
 {% extends 'catalogo/base.html' %}
 {% comment %}
-    lista_jogos.html: mostra os jogos em cards, com os filtros de pesquisa em cima.
+    lista_jogos.html: mostra os jogos em cards, com os filtros de pesquisa em cima e a paginação embaixo.
     É renderizada pela ListaJogosView, que manda:
-    - "jogos": a lista já filtrada e em ordem alfabética
-    - "form_filtro": o FiltroJogoForm, com o que a pessoa buscou
+    - "jogos": os jogos DA PÁGINA ATUAL, já filtrados e ordenados
+    - "form_filtro": o FiltroJogoForm, com o que a pessoa buscou (e os erros, se tiver)
+    - "page_obj" e "paginator": vêm da paginação da ListView (paginate_by no views.py)
 {% endcomment %}
 
 {% block titulo %}Jogos - GameDex{% endblock %}
@@ -18,13 +19,34 @@
 
 {% comment %}
     Formulário de filtros. Ele usa method="get", então os campos vão pra URL
-    (ex: /jogos/?titulo=zelda&plataforma=2) e a ListaJogosView lê pelo request.GET.
+    (ex: /jogos/?busca=zelda&plataforma=2) e a ListaJogosView lê pelo request.GET.
     GET não muda nada no banco, por isso esse formulário não precisa de csrf_token.
-    action aponta pra própria lista, assim a busca sempre volta pra esta página.
+    Não tem campo "page" aqui de propósito: toda busca nova começa na página 1.
+
+    Em vez do form.as_div (que desenha tudo de uma vez), desenho cada campo na mão com o
+    form_filtro.nome_do_campo. Assim consigo deixar a busca grande numa linha e os outros
+    filtros numa grade embaixo. Cada campo tem label_tag (o rótulo), o próprio campo e .errors.
 {% endcomment %}
 <form method="get" action="{% url 'lista_jogos' %}" class="formulario filtros">
-    {# desenha os 5 campos de filtro (título, categoria, plataforma, desenvolvedora e preço) #}
-    {{ form_filtro.as_div }}
+    <div class="filtro-busca">
+        {{ form_filtro.busca.label_tag }}
+        {{ form_filtro.busca }}
+        {{ form_filtro.busca.errors }}
+    </div>
+
+    <div class="filtros-grade">
+        {# um for pelos campos que vão na grade, pra não repetir o mesmo HTML 8 vezes #}
+        {% for campo in form_filtro %}
+            {% if campo.name != 'busca' %}
+            <div>
+                {{ campo.label_tag }}
+                {{ campo }}
+                {{ campo.errors }}
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
     <div class="botoes">
         <button type="submit" class="botao">Pesquisar</button>
         {# limpar é só abrir a lista sem nada depois do "?" #}
@@ -32,8 +54,20 @@
     </div>
 </form>
 
-{# jogos|length conta quantos jogos sobraram depois dos filtros #}
-<p class="resultado-busca">{{ jogos|length }} jogo{{ jogos|length|pluralize }} encontrado{{ jogos|length|pluralize }}</p>
+{% comment %}
+    Se algum campo teve erro, a view aplicou só os filtros que estavam certos.
+    Aviso aqui pra pessoa não achar que o resultado já considera o filtro errado.
+    form_filtro.errors é um dicionário com os erros. Vazio conta como falso no if.
+{% endcomment %}
+{% if form_filtro.errors %}
+<p class="aviso-filtro">Alguns filtros têm valores inválidos e foram ignorados. Confira os campos marcados acima.</p>
+{% endif %}
+
+{# paginator.count é o total de jogos encontrados (de todas as páginas), não só os desta página #}
+<p class="resultado-busca">
+    {{ paginator.count }} jogo{{ paginator.count|pluralize }} encontrado{{ paginator.count|pluralize }}
+    {% if paginator.num_pages > 1 %}- página {{ page_obj.number }} de {{ paginator.num_pages }}{% endif %}
+</p>
 
 {% if jogos %}
 <div class="grade-cards">
@@ -43,7 +77,31 @@
     {% endfor %}
 </div>
 {% else %}
-{# aparece quando não tem jogo cadastrado ou quando nenhum jogo bate com os filtros #}
-<p class="vazio">Nenhum jogo encontrado.</p>
+<p class="vazio">Nenhum jogo encontrado com esses filtros.</p>
+{% endif %}
+
+{% comment %}
+    Paginação. page_obj é a página atual, e tem has_previous, has_next, previous_page_number...
+    A tag {% querystring page=N %} monta a URL com TODOS os filtros que já estão nela e só troca o page.
+    Sem isso, ao clicar em "Próxima" a pessoa perderia a busca e voltaria pra lista inteira.
+{% endcomment %}
+{% if page_obj.has_other_pages %}
+<nav class="paginacao" aria-label="Páginas">
+    {% if page_obj.has_previous %}
+    <a href="{% querystring page=page_obj.previous_page_number %}" class="botao botao-secundario botao-pequeno">Anterior</a>
+    {% endif %}
+
+    {% for numero in paginator.page_range %}
+        {% if numero == page_obj.number %}
+        <span class="pagina-atual">{{ numero }}</span>
+        {% else %}
+        <a href="{% querystring page=numero %}" class="pagina">{{ numero }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <a href="{% querystring page=page_obj.next_page_number %}" class="botao botao-secundario botao-pequeno">Próxima</a>
+    {% endif %}
+</nav>
 {% endif %}
 {% endblock %}

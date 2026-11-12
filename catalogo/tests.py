@@ -95,15 +95,59 @@ class FiltrosTest(GameDexTestCase):
     def test_sem_filtro_mostra_todos(self):
         self.assertEqual(self.buscar(), ['Minecraft', 'Zelda'])
 
-    def test_filtro_por_titulo_sem_ligar_pra_maiuscula(self):
-        self.assertEqual(self.buscar(titulo='zel'), ['Zelda'])
+    def test_busca_por_titulo_sem_ligar_pra_maiuscula(self):
+        self.assertEqual(self.buscar(busca='zel'), ['Zelda'])
+
+    def test_busca_tambem_procura_na_desenvolvedora(self):
+        self.assertEqual(self.buscar(busca='mojang'), ['Minecraft'])
+
+    def test_busca_por_palavras_fora_de_ordem(self):
+        self.assertEqual(self.buscar(busca='nintendo zelda'), ['Zelda'])
 
     def test_filtro_por_categoria(self):
         self.assertEqual(self.buscar(categoria=self.rpg.pk), ['Zelda'])
 
-    def test_filtro_por_preco_maximo(self):
-        self.assertEqual(self.buscar(preco_max='150'), ['Minecraft'])
+    def test_preco_com_virgula(self):
+        self.assertEqual(self.buscar(preco_max='150,50'), ['Minecraft'])
 
-    def test_filtro_invalido_nao_quebra_a_pagina(self):
-        resposta = self.client.get(reverse('lista_jogos'), {'categoria': 'abc', 'preco_max': 'xyz'})
-        self.assertEqual(resposta.status_code, 200)
+    def test_faixa_de_preco(self):
+        self.assertEqual(self.buscar(preco_min='150', preco_max='300'), ['Zelda'])
+
+    def test_preco_minimo_maior_que_maximo_da_erro(self):
+        resposta = self.client.get(reverse('lista_jogos'), {'preco_min': '300', 'preco_max': '100'})
+        self.assertIn('preco_max', resposta.context['form_filtro'].errors)
+
+    def test_campo_invalido_nao_derruba_os_outros_filtros(self):
+        # categoria=abc é inválida, mas o filtro de preço tem que continuar valendo
+        self.assertEqual(self.buscar(categoria='abc', preco_max='150'), ['Minecraft'])
+
+    def test_busca_gigante_e_recusada(self):
+        resposta = self.client.get(reverse('lista_jogos'), {'busca': 'x' * 5000})
+        self.assertIn('busca', resposta.context['form_filtro'].errors)
+
+    def test_ordenar_por_maior_preco(self):
+        self.assertEqual(self.buscar(ordem='maior_preco'), ['Zelda', 'Minecraft'])
+
+    def test_ordem_que_nao_existe_usa_titulo(self):
+        self.assertEqual(self.buscar(ordem='password'), ['Minecraft', 'Zelda'])
+
+    def test_filtro_por_nota_media(self):
+        Avaliacao.objects.create(jogo=self.zelda, usuario=self.comum, nota=5)
+        Avaliacao.objects.create(jogo=self.minecraft, usuario=self.comum, nota=2)
+        self.assertEqual(self.buscar(nota_min='4'), ['Zelda'])
+
+    def test_pagina_invalida_nao_da_erro(self):
+        for pagina in ['abc', '999']:
+            resposta = self.client.get(reverse('lista_jogos'), {'page': pagina})
+            self.assertEqual(resposta.status_code, 200)
+
+    def test_paginacao_mantem_os_filtros(self):
+        # cria jogos a mais pra passar dos 9 por página
+        for numero in range(10):
+            Jogo.objects.create(
+                titulo=f'Teste {numero}', descricao='x', ano_lancamento=2020, preco=10,
+                desenvolvedora=self.zelda.desenvolvedora, plataforma=self.zelda.plataforma,
+            )
+        resposta = self.client.get(reverse('lista_jogos'), {'busca': 'teste'})
+        # o link da página 2 tem que levar a busca junto
+        self.assertContains(resposta, '?busca=teste&amp;page=2')

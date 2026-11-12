@@ -7,6 +7,8 @@ from django.contrib.auth.forms import UserCreationForm
 # - LoginRequiredMixin: só deixa entrar quem está logado. Quem não está vai pra página de login.
 # - UserPassesTestMixin: só deixa entrar quem passar no teste do método test_func().
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+# Avg calcula a média de um campo (AVG no SQL) e Q monta condições com OU (ver ListaJogosView).
+from django.db.models import Avg, Q
 # get_object_or_404: busca um objeto no banco e, se não achar, mostra erro 404 (página não encontrada)
 from django.shortcuts import get_object_or_404, redirect
 # reverse monta o endereço a partir do name da URL (igual o {% url %} dos templates).
@@ -76,60 +78,114 @@ class InicioView(TemplateView):
         return context
 
 
-# ListaJogosView: mostra os jogos do catálogo, com os filtros de pesquisa.
-# Roda quando acessa "/jogos/". Com filtro a URL fica tipo "/jogos/?titulo=zelda&plataforma=2".
+# Ordenações que a lista aceita: a chave é o valor que vem da URL (?ordem=menor_preco) e o valor
+# é o que vai pro order_by(). O "-" na frente é ordem decrescente. O 'titulo' do fim de cada uma
+# desempata: dois jogos com o mesmo preço ficam em ordem alfabética.
+# Em 'nota', jogo sem avaliação tem média None, e no MySQL o None vem por último no "-media".
+ORDENACOES = {
+    'titulo': ['titulo'],
+    'menor_preco': ['preco', 'titulo'],
+    'maior_preco': ['-preco', 'titulo'],
+    'recentes': ['-ano_lancamento', 'titulo'],
+    'nota': ['-media', 'titulo'],
+}
+
+
+# ListaJogosView: mostra os jogos do catálogo, com os filtros de pesquisa e paginação.
+# Roda quando acessa "/jogos/". Com filtro a URL fica tipo "/jogos/?busca=zelda&plataforma=2&ordem=nota".
 # A ListView busca a lista no get_queryset() e manda pro template com o nome do context_object_name.
 class ListaJogosView(ListView):
     model = Jogo
     template_name = 'catalogo/lista_jogos.html'
     # Sem isso a lista ia se chamar "object_list" (ou "jogo_list") no template. Com "jogos" fica mais claro.
     context_object_name = 'jogos'
+    # paginate_by liga a paginação da ListView: 9 jogos por página (3 linhas de 3 cards).
+    # A página vem na URL como ?page=2, e o template recebe page_obj e paginator.
+    paginate_by = 9
 
-    # get_queryset: decide QUAIS jogos aparecem. É aqui que os filtros entram.
+    # get_queryset: decide QUAIS jogos aparecem e em que ordem. É aqui que os filtros entram.
     def get_queryset(self):
-        # Começo com todos os jogos em ordem alfabética e vou "afunilando" com cada filtro preenchido.
-        # O QuerySet só vai pro banco quando é usado de verdade, então cada .filter() aqui
-        # só acrescenta uma condição no WHERE do SQL, sem fazer uma busca nova por filtro.
-        jogos = Jogo.objects.all().order_by('titulo')
+        # select_related e prefetch_related resolvem o problema "N+1":
+        # o card de cada jogo mostra a desenvolvedora, a plataforma e as categorias. Sem isso o Django
+        # fazia uma consulta nova no banco pra cada uma dessas coisas em CADA card (eram 28 consultas pra 8 jogos).
+        # - select_related: pra ForeignKey. Traz a desenvolvedora e a plataforma no mesmo SQL, com JOIN.
+        # - prefetch_related: pra ManyToMany. Faz UMA consulta a mais com as categorias de todos os jogos.
+        # annotate(media=Avg(...)) calcula a média das notas de cada jogo e coloca no jogo como "media".
+        # Uso ela no filtro de nota mínima e na ordenação "mais bem avaliados".
+        jogos = (
+            Jogo.objects.select_related('desenvolvedora', 'plataforma')
+            .prefetch_related('categorias')
+            .annotate(media=Avg('avaliacoes__nota'))
+        )
 
         # Os filtros chegam pelo request.GET (os parâmetros depois do "?" na URL).
         # Uso GET e não POST porque buscar não muda nada no banco, e assim o link com o filtro
         # pode ser salvo ou compartilhado. Passo pro FiltroJogoForm pra ele conferir os valores.
         self.form_filtro = FiltroJogoForm(self.request.GET)
+        # is_valid() roda a validação. Eu não uso o resultado dele (True/False) aqui de propósito:
+        # antes, se UM campo estivesse errado (ex: ?categoria=abc), eu ignorava TODOS os filtros.
+        # O cleaned_data guarda só os campos que passaram, mesmo quando outro deu erro.
+        # Então eu aplico os que estão certos, e o template avisa quais foram ignorados.
+        self.form_filtro.is_valid()
+        # .get() devolve None quando o campo não está no cleaned_data (porque deu erro ou veio vazio)
+        dados = self.form_filtro.cleaned_data
 
-        # Se algum valor for inválido (ex: ?preco_max=abc), o is_valid() dá False e eu mostro
-        # a lista sem filtro, com a mensagem de erro do lado do campo.
-        if self.form_filtro.is_valid():
-            # cleaned_data: os valores já conferidos. Nos ModelChoiceField ele já vem como objeto
-            # (uma Categoria, uma Plataforma...) e não como o id em texto.
-            dados = self.form_filtro.cleaned_data
+        busca = dados.get('busca')
+        if busca:
+            # split() separa o texto em palavras: "witcher wild" vira ['witcher', 'wild'].
+            # Cada palavra precisa aparecer no título OU no nome da desenvolvedora.
+            # Q() é um objeto do Django pra montar condições com OU (|). Num filter() normal as
+            # condições sempre são E. Aqui fica: (titulo contém palavra OU desenvolvedora contém palavra).
+            # Como eu chamo um filter() por palavra, as palavras entre si ficam com E.
+            # icontains = "contém", sem ligar pra maiúscula/minúscula (vira LIKE '%palavra%' no SQL).
+            # O ORM manda o texto separado do SQL, então não tem SQL injection, e ele também
+            # trata o % e o _ digitados como letra normal (não como coringa do LIKE).
+            for palavra in busca.split():
+                jogos = jogos.filter(
+                    Q(titulo__icontains=palavra) | Q(desenvolvedora__nome__icontains=palavra)
+                )
+        if dados.get('categoria'):
+            # categorias é ManyToMany. O filter por ele traz os jogos que têm essa categoria
+            # (o Django faz o JOIN com a tabela do meio sozinho).
+            jogos = jogos.filter(categorias=dados['categoria'])
+        if dados.get('plataforma'):
+            jogos = jogos.filter(plataforma=dados['plataforma'])
+        if dados.get('desenvolvedora'):
+            jogos = jogos.filter(desenvolvedora=dados['desenvolvedora'])
+        # Nos números eu comparo com "is not None" e não só com "if", porque 0 é um valor válido
+        # (preço até 0 = só os gratuitos) e 0 contaria como falso num if normal.
+        # gte = maior ou igual (greater than or equal), lte = menor ou igual (less than or equal).
+        if dados.get('preco_min') is not None:
+            jogos = jogos.filter(preco__gte=dados['preco_min'])
+        if dados.get('preco_max') is not None:
+            jogos = jogos.filter(preco__lte=dados['preco_max'])
+        if dados.get('ano_min') is not None:
+            jogos = jogos.filter(ano_lancamento__gte=dados['ano_min'])
+        if dados.get('nota_min') is not None:
+            # media é o campo calculado no annotate lá em cima. Jogo sem avaliação tem media None
+            # e não entra quando alguém filtra por nota.
+            jogos = jogos.filter(media__gte=dados['nota_min'])
 
-            # Cada if só aplica o filtro se o campo foi preenchido (campo vazio vem como '' ou None).
-            if dados['titulo']:
-                # titulo__icontains = "o título contém esse texto", sem ligar pra maiúscula/minúscula.
-                # Vira um LIKE '%zelda%' no SQL. Então "zel" já acha "The Legend of Zelda".
-                # O ORM manda o texto separado do SQL, então não tem como fazer SQL injection pela busca.
-                jogos = jogos.filter(titulo__icontains=dados['titulo'])
-            if dados['categoria']:
-                # categorias é ManyToMany. O filter por ele traz os jogos que têm essa categoria
-                # (o Django faz o JOIN com a tabela do meio sozinho).
-                jogos = jogos.filter(categorias=dados['categoria'])
-            if dados['plataforma']:
-                jogos = jogos.filter(plataforma=dados['plataforma'])
-            if dados['desenvolvedora']:
-                jogos = jogos.filter(desenvolvedora=dados['desenvolvedora'])
-            # Aqui eu comparo com "is not None" e não só "if", porque preço 0 é um filtro válido
-            # (mostrar só os gratuitos), e 0 contaria como falso num if normal.
-            if dados['preco_max'] is not None:
-                # preco__lte = "preço menor ou igual a" (lte = less than or equal).
-                jogos = jogos.filter(preco__lte=dados['preco_max'])
+        # Ordem: se não veio nada (ou veio uma opção que não existe), usa título A-Z.
+        # O ChoiceField já recusa opção inválida (ela nem entra no cleaned_data), e o "or 'titulo'" garante o padrão.
+        ordem = dados.get('ordem') or 'titulo'
+        # O * "desempacota" a lista: order_by(*['preco', 'titulo']) é o mesmo que order_by('preco', 'titulo').
+        return jogos.order_by(*ORDENACOES[ordem])
 
-        return jogos
+    # paginate_queryset: é o método da ListView que corta a lista na página certa.
+    # O padrão dele dá erro 404 quando a página não existe (?page=abc ou ?page=999).
+    # Troquei pelo paginator.get_page(), que nesses casos devolve a primeira ou a última página.
+    # Ele precisa devolver 4 coisas: o paginator, a página, a lista da página e se tem mais de uma página.
+    def paginate_queryset(self, queryset, page_size):
+        paginator = self.get_paginator(queryset, page_size)
+        pagina = paginator.get_page(self.request.GET.get('page'))
+        return paginator, pagina, pagina.object_list, pagina.has_other_pages()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Mando o formulário de filtro pro template desenhar os campos.
-        # Como ele foi criado com o request.GET, os campos já aparecem com o que a pessoa buscou.
+        # Como ele foi criado com o request.GET, os campos já aparecem com o que a pessoa buscou,
+        # e com as mensagens de erro dos campos que foram ignorados.
         context['form_filtro'] = self.form_filtro
         return context
 

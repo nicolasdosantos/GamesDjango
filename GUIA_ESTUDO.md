@@ -125,12 +125,32 @@ Como foi feito:
 
 ### 2.2 Filtros de pesquisa
 
-Na `/jogos/` tem um formulário com `method="get"`, então a busca vai na URL: `/jogos/?titulo=zel&plataforma=3&preco_max=200`. A `ListaJogosView.get_queryset()`:
-1. começa com todos os jogos (`Jogo.objects.all().order_by('titulo')`);
-2. passa o `request.GET` pro `FiltroJogoForm` e chama `is_valid()` (valor inválido, tipo `?categoria=abc`, não quebra a página);
-3. pra cada campo preenchido, aplica um `.filter()`: `titulo__icontains` (contém, sem ligar pra maiúscula), `categorias=`, `plataforma=`, `desenvolvedora=` e `preco__lte` (menor ou igual).
+Na `/jogos/` tem um formulário com `method="get"`, então a busca vai na URL: `/jogos/?busca=witcher&preco_max=200,00&ordem=nota`. Uso GET e não POST porque a busca não muda nada no banco e o link com o filtro pode ser salvo ou compartilhado.
 
-Os `.filter()` vão se juntando num SQL só (vários `AND` no `WHERE`). Uso GET e não POST porque a busca não muda nada no banco e o link com o filtro pode ser salvo ou compartilhado.
+**Filtros:** busca (título **ou** desenvolvedora), categoria, plataforma, desenvolvedora, preço de/até, lançado a partir de (ano), nota média mínima e ordenação (título, menor/maior preço, mais recentes, mais bem avaliados). Tem paginação de 9 jogos por página.
+
+**Como a `ListaJogosView.get_queryset()` funciona:**
+1. Começa com todos os jogos, já com `select_related('desenvolvedora', 'plataforma')`, `prefetch_related('categorias')` e `annotate(media=Avg('avaliacoes__nota'))`.
+2. Passa o `request.GET` pro `FiltroJogoForm` e chama `is_valid()`.
+3. Usa o `cleaned_data`, que tem **só os campos válidos**. Assim, um campo errado não derruba os outros filtros.
+4. Pra cada campo preenchido aplica um `.filter()`. Na busca, o texto é separado em palavras e cada uma precisa estar no título **ou** na desenvolvedora (com `Q(...) | Q(...)`).
+5. Ordena pela opção escolhida, usando o dicionário `ORDENACOES` (lista fechada).
+
+**As brechas que foram fechadas** (cada uma tem um teste no `tests.py`):
+
+| Antes | Agora |
+|---|---|
+| `99,90` (vírgula) dava erro | `localize=True` aceita o formato brasileiro |
+| um campo inválido fazia ignorar **todos** os filtros | aplica os válidos e mostra o aviso "alguns filtros foram ignorados" |
+| preço sem limite (`99999999999999`) | `max_digits`, `max_value` e `min_value` iguais ao model |
+| busca sem limite de tamanho | `max_length=100` |
+| "mojang" não achava nada | a busca olha o título e a desenvolvedora |
+| "witcher wild" não achava nada | busca palavra por palavra |
+| preço mínimo maior que o máximo | o `clean()` do form mostra um erro |
+| 28 consultas no banco pra 8 jogos (N+1) | 6 consultas, com `select_related`/`prefetch_related` |
+| `?page=abc` ou `?page=999` | o `paginator.get_page()` cai numa página válida em vez de dar 404 |
+
+**Paginação com filtro:** os links das páginas usam `{% querystring page=N %}`, que copia todos os parâmetros da URL atual e só troca o `page`. Sem isso, ao ir pra página 2 a pessoa perderia a busca.
 
 ### `catalogo/urls.py` – endereços do app
 Liga cada URL a uma view (com `.as_view()`, porque as views são classes) e dá um `name` pra ela. Esse name é usado no `{% url %}` dos templates e no `reverse()` das views. O `<int:pk>` pega o número da URL e passa pra view. Antes era `<int:id>`, mas a DetailView, UpdateView e DeleteView procuram o objeto por um parâmetro chamado `pk`. Também tem as rotas `/cadastro/`, `/login/`, `/logout/` e `/perfil/`.
@@ -175,7 +195,7 @@ São arquivos que o `startproject`/`startapp` criaram (ou que o Django gerou) e 
 | `gamedex/wsgi.py` | Porta de entrada pra servidores WSGI (o padrão de como um servidor web conversa com Python). O `runserver` usa o `application` daqui, por causa do `WSGI_APPLICATION` no settings, e um servidor de produção (tipo gunicorn) também usaria. |
 | `gamedex/asgi.py` | Mesma ideia, só que pra servidores ASGI (assíncronos, que aguentam websockets). **Não é usado** neste projeto. |
 | `catalogo/apps.py` | Configuração do app (`CatalogoConfig`). O `'catalogo'` no `INSTALLED_APPS` aponta pra ela. |
-| `catalogo/tests.py` | Testes automáticos (`TestCase`). São 12 testes, dos níveis de acesso, do cadastro/perfil e dos filtros. Rodam com `python manage.py test catalogo` num banco separado (`test_gamedex`), que o Django cria e apaga sozinho. |
+| `catalogo/tests.py` | Testes automáticos (`TestCase`). São 22 testes, dos níveis de acesso, do cadastro/perfil e dos filtros (um pra cada brecha que foi corrigida). Rodam com `python manage.py test catalogo` num banco separado (`test_gamedex`), que o Django cria e apaga sozinho. |
 | `__init__.py` (em `gamedex/`, `catalogo/` e `migrations/`) | Transformam a pasta num pacote Python, aí dá pra importar `gamedex.settings`, `catalogo.urls` etc. Sem o de `migrations/`, o Django acha que o app não tem migrations. Os de `catalogo/` e `migrations/` estão vazios. O de `gamedex/` tem o `pymysql.install_as_MySQLdb()`, porque ele roda antes de tudo (ver seção 5). |
 | `requirements.txt` | Lista dos pacotes e versões que o projeto precisa: Django 6.1.2, PyMySQL (conexão com o MySQL) e `cryptography` (login no MySQL 8 com senha). `asgiref`, `sqlparse`, `cffi` e `pycparser` vêm junto como dependências. Num computador novo: criar a venv e rodar `pip install -r requirements.txt`. |
 | `banco/gamedex.sql` | Script que cria o banco MySQL inteiro: banco, usuário, tabelas, migrations aplicadas e dados de exemplo (ver seção 5). |
@@ -352,7 +372,7 @@ O Django cria sozinho uma chave primária `id` (BigAutoField, um número que aum
 `manage.py` roda os comandos (runserver, migrate...). `wsgi.py` é a porta de entrada do site pra um servidor web, e o próprio runserver usa ela. `asgi.py` é a versão assíncrona e não é usada aqui.
 
 **29. Como você testou o projeto? Tem testes automáticos?**
-Os dois. Testei na mão pelo navegador e escrevi 12 testes automáticos no `tests.py` (classes `TestCase`): user comum não consegue cadastrar/editar/excluir (403), visitante vai pro login, admin consegue excluir, a avaliação fica no nome de quem está logado, o cadastro cria o perfil e cada filtro traz os jogos certos. Rodam com `python manage.py test catalogo`.
+Os dois. Testei na mão pelo navegador e escrevi 22 testes automáticos no `tests.py` (classes `TestCase`): user comum não consegue cadastrar/editar/excluir (403), visitante vai pro login, admin consegue excluir, a avaliação fica no nome de quem está logado, o cadastro cria o perfil e cada filtro traz os jogos certos. Rodam com `python manage.py test catalogo`.
 
 **30. Pra que servem a venv e o `requirements.txt`?**
 A venv é um Python separado só pra este projeto, pra versão do Django não brigar com a de outros projetos. O `requirements.txt` lista os pacotes e versões, e com `pip install -r requirements.txt` qualquer pessoa instala tudo igual.
@@ -403,7 +423,16 @@ Admin é quem tem `is_staff = True`, user é quem tem `False`. As views de cadas
 Não. A pessoa pode digitar a URL na mão ou mandar um POST direto. A proteção de verdade é a do mixin na view. Esconder o botão é só pra tela ficar organizada. Tem um teste (`test_user_comum_nao_pode_cadastrar_editar_nem_excluir`) que manda o POST direto e confere que o jogo não foi apagado.
 
 **46. Como funciona o filtro de pesquisa?**
-O formulário usa GET, então os filtros vão na URL. A `ListaJogosView.get_queryset()` valida com o `FiltroJogoForm` e aplica um `.filter()` pra cada campo preenchido (`titulo__icontains`, `categorias`, `plataforma`, `desenvolvedora`, `preco__lte`). O ORM junta tudo num SQL só.
+O formulário usa GET, então os filtros vão na URL. A `ListaJogosView.get_queryset()` valida com o `FiltroJogoForm` e aplica um `.filter()` pra cada campo válido (`titulo__icontains`/`desenvolvedora__nome__icontains` com `Q`, `categorias`, `plataforma`, `preco__gte`, `preco__lte`, `ano_lancamento__gte`, `media__gte`). O ORM junta tudo num SQL só. Se um campo vier errado, só ele é ignorado.
+
+**46b. O que é o problema N+1 e como você resolveu?**
+É quando a página faz 1 consulta pra lista e mais N consultas, uma por item, pra buscar dados relacionados (aqui, a desenvolvedora, a plataforma e as categorias de cada card). Resolvi com `select_related` (ForeignKey, vem junto num JOIN) e `prefetch_related` (ManyToMany, uma consulta a mais pra todos). Caiu de 28 pra 6 consultas.
+
+**46c. Pra que serve o `annotate(Avg(...))`?**
+Ele calcula a média das notas de cada jogo direto no banco (`AVG` no SQL) e coloca no objeto como `jogo.media`. Uso pra filtrar por nota mínima e pra ordenar pelos mais bem avaliados.
+
+**46d. Por que a ordenação usa uma lista fechada?**
+Se eu fizesse `order_by(request.GET['ordem'])`, a pessoa poderia ordenar por qualquer campo, até um que eu não quero expor. Com o `ChoiceField` e o dicionário `ORDENACOES`, só as 5 opções que eu defini são aceitas.
 
 **47. Dá pra fazer SQL injection pela busca?**
 Não. O ORM manda o texto da busca separado do comando SQL (parâmetro), então ele nunca vira código. E os selects passam pelo `ModelChoiceField`, que só aceita id que existe.

@@ -131,13 +131,43 @@ class PerfilForm(forms.ModelForm):
 # FiltroJogoForm: os filtros de pesquisa da lista de jogos. Usado na view ListaJogosView.
 # Esse NÃO é ModelForm, é um forms.Form normal, porque ele não salva nada no banco.
 # Ele só serve pra desenhar os campos de busca e conferir o que a pessoa mandou na URL
-# (ex: /jogos/?titulo=zelda&plataforma=2). Todos os campos têm required=False porque
+# (ex: /jogos/?busca=zelda&plataforma=2). Todos os campos têm required=False porque
 # a pessoa pode usar só um filtro, vários ou nenhum.
+#
+# Tudo que chega pela URL pode ter sido digitado na mão, então cada campo tem limites
+# (tamanho máximo, valor mínimo e máximo) pra não deixar passar valor absurdo.
 class FiltroJogoForm(forms.Form):
-    titulo = forms.CharField(required=False, label='Título')
+    # Opções de ordenação. O primeiro valor de cada par é o que vai na URL (?ordem=menor_preco)
+    # e o segundo é o texto que aparece no select.
+    # A view só aceita essas opções: ela troca a chave escolhida pelo campo de verdade (ver ORDENACOES
+    # no views.py). Se eu passasse o que veio da URL direto pro order_by(), qualquer pessoa podia
+    # ordenar por um campo que eu não quero expor.
+    ORDENS = [
+        ('titulo', 'Título (A-Z)'),
+        ('menor_preco', 'Menor preço'),
+        ('maior_preco', 'Maior preço'),
+        ('recentes', 'Lançamento mais recente'),
+        ('nota', 'Mais bem avaliados'),
+    ]
+    NOTAS_MINIMAS = [
+        ('', 'Qualquer nota'),
+        ('2', '2 ou mais'),
+        ('3', '3 ou mais'),
+        ('4', '4 ou mais'),
+        ('5', 'Só nota 5'),
+    ]
+
+    # max_length=100 é o mesmo tamanho do título no model. Sem isso dava pra mandar
+    # um texto de milhares de letras na URL e ele ia inteiro pro SQL.
+    # (O CharField já tira os espaços do começo e do fim, então "   " vira vazio.)
+    busca = forms.CharField(
+        required=False, max_length=100, label='Buscar',
+        # widget com placeholder: o texto cinza de exemplo dentro do campo
+        widget=forms.TextInput(attrs={'placeholder': 'Título ou desenvolvedora (ex: zelda, nintendo)'}),
+    )
     # ModelChoiceField = um select com os registros de um model.
     # Além de montar as opções, ele confere se o id mandado existe mesmo no banco.
-    # Se alguém digitar ?categoria=abc ou ?categoria=999 na URL, o is_valid() recusa e não dá erro na página.
+    # Se alguém digitar ?categoria=abc ou ?categoria=999 na URL, o campo dá erro em vez de quebrar a página.
     categoria = forms.ModelChoiceField(
         queryset=Categoria.objects.all(), required=False, empty_label='Todas'
     )
@@ -147,7 +177,37 @@ class FiltroJogoForm(forms.Form):
     desenvolvedora = forms.ModelChoiceField(
         queryset=Desenvolvedora.objects.order_by('nome'), required=False, empty_label='Todas'
     )
-    # min_value=0 barra preço negativo na busca, igual ao MinValueValidator do model.
-    preco_max = forms.DecimalField(
-        required=False, min_value=0, decimal_places=2, label='Preço até (R$)'
+    # localize=True faz o campo aceitar o número no formato do LANGUAGE_CODE (pt-br),
+    # então "99,90" funciona. Sem isso só aceitava "99.90", e quem digitava com vírgula levava erro.
+    # max_digits e decimal_places são os mesmos do preço no model (até 999999.99).
+    # min_value e max_value barram preço negativo e valor gigante.
+    preco_min = forms.DecimalField(
+        required=False, localize=True, max_digits=8, decimal_places=2,
+        min_value=0, max_value=999999.99, label='Preço de (R$)',
     )
+    preco_max = forms.DecimalField(
+        required=False, localize=True, max_digits=8, decimal_places=2,
+        min_value=0, max_value=999999.99, label='Preço até (R$)',
+    )
+    # IntegerField só aceita número inteiro. Os limites deixam de fora ano tipo 0 ou 99999.
+    ano_min = forms.IntegerField(
+        required=False, min_value=1950, max_value=2100, label='Lançado a partir de',
+    )
+    # TypedChoiceField é um select que já converte o valor escolhido (coerce=int transforma "4" em 4).
+    # empty_value=None faz a opção "Qualquer nota" virar None, que a view entende como "sem filtro".
+    nota_min = forms.TypedChoiceField(
+        choices=NOTAS_MINIMAS, coerce=int, empty_value=None, required=False, label='Nota média',
+    )
+    ordem = forms.ChoiceField(choices=ORDENS, required=False, label='Ordenar por')
+
+    # clean() roda depois da validação de cada campo e serve pra conferir um campo junto com outro.
+    # Aqui confiro se o preço mínimo não é maior que o máximo (ex: de 300 até 100 nunca acha nada).
+    # self.add_error() coloca a mensagem embaixo do campo, igual aos outros erros.
+    def clean(self):
+        dados = super().clean()
+        preco_min = dados.get('preco_min')
+        preco_max = dados.get('preco_max')
+        # "is not None" porque 0 é um preço válido e contaria como falso num if normal
+        if preco_min is not None and preco_max is not None and preco_min > preco_max:
+            self.add_error('preco_max', 'O preço máximo não pode ser menor que o mínimo.')
+        return dados
