@@ -1,7 +1,7 @@
 {% extends 'catalogo/base.html' %}
 {% comment %}
     form_jogo.html: formulário de jogo, usado tanto pra CADASTRAR quanto pra EDITAR.
-    É renderizado pelas views novo_jogo e editar_jogo, que mandam o "form" (JogoForm)
+    É renderizado pelas views NovoJogoView e EditarJogoView (só admin), que mandam o "form" (JogoForm)
     e o "titulo_pagina". Uso um template só pros dois porque os campos são os mesmos.
     O que muda é o título e se o form vem vazio ou preenchido, e isso a view já resolve.
 {% endcomment %}

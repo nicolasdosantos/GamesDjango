@@ -2,11 +2,11 @@
 # valida o que a pessoa digitou e mostra as mensagens de erro.
 from django import forms
 
-from .models import Avaliacao, Desenvolvedora, Jogo
+from .models import Avaliacao, Categoria, Desenvolvedora, Jogo, Perfil, Plataforma
 
 
 # JogoForm: formulário de cadastrar e editar jogo.
-# É usado nas views novo_jogo e editar_jogo. Quando eu chamo form.save(), ele retorna o Jogo salvo.
+# É usado nas views NovoJogoView e EditarJogoView. Quando eu chamo form.save(), ele retorna o Jogo salvo.
 # ModelForm = formulário criado a partir de um model. O Django olha os campos do Jogo
 # e já cria os campos do formulário com as validações certas (obrigatório, número, preço >= 0...).
 # Assim eu não preciso repetir tudo que já está no models.py.
@@ -88,16 +88,18 @@ class JogoForm(forms.ModelForm):
         return super().save(commit)
 
 
-# AvaliacaoForm: formulário pra avaliar um jogo. Usado na view avaliar_jogo.
+# AvaliacaoForm: formulário pra avaliar um jogo. Usado na view AvaliarJogoView.
 # Também é ModelForm, então o save() retorna uma Avaliacao.
 class AvaliacaoForm(forms.ModelForm):
     class Meta:
         model = Avaliacao
-        # 'jogo' fica de fora porque a pessoa não escolhe o jogo: ele vem da URL e a view coloca
-        # depois com save(commit=False). 'data' fica de fora porque o auto_now_add preenche sozinho.
-        fields = ['nome_usuario', 'nota', 'comentario']
+        # 'jogo' fica de fora porque a pessoa não escolhe o jogo: ele vem da URL.
+        # 'usuario' também fica de fora: é sempre quem está logado. Se ele estivesse no formulário,
+        # alguém podia mexer no HTML e mandar uma avaliação no nome de outra pessoa.
+        # Os dois são colocados pela view (AvaliarJogoView, no form_valid).
+        # 'data' fica de fora porque o auto_now_add preenche sozinho.
+        fields = ['nota', 'comentario']
         labels = {
-            'nome_usuario': 'Seu nome',
             'comentario': 'Comentário',
         }
 
@@ -107,3 +109,45 @@ class AvaliacaoForm(forms.ModelForm):
         # Aqui eu troco a lista inteira pra essa opção vazia ter um texto em português.
         # Como o valor dela é '', se a pessoa não escolher nenhuma nota o is_valid() dá erro de campo obrigatório.
         self.fields['nota'].choices = [('', 'Selecione uma nota')] + Avaliacao.NOTAS
+
+
+# PerfilForm: formulário da página "Meu perfil". Usado na view PerfilView.
+# O campo 'usuario' fica de fora pelo mesmo motivo da avaliação: a pessoa só edita o próprio perfil,
+# e quem decide qual perfil é a view (pelo request.user), não o formulário.
+class PerfilForm(forms.ModelForm):
+    class Meta:
+        model = Perfil
+        fields = ['bio', 'plataforma_favorita']
+        labels = {
+            'bio': 'Sobre você',
+            'plataforma_favorita': 'Plataforma favorita',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['plataforma_favorita'].empty_label = 'Nenhuma'
+
+
+# FiltroJogoForm: os filtros de pesquisa da lista de jogos. Usado na view ListaJogosView.
+# Esse NÃO é ModelForm, é um forms.Form normal, porque ele não salva nada no banco.
+# Ele só serve pra desenhar os campos de busca e conferir o que a pessoa mandou na URL
+# (ex: /jogos/?titulo=zelda&plataforma=2). Todos os campos têm required=False porque
+# a pessoa pode usar só um filtro, vários ou nenhum.
+class FiltroJogoForm(forms.Form):
+    titulo = forms.CharField(required=False, label='Título')
+    # ModelChoiceField = um select com os registros de um model.
+    # Além de montar as opções, ele confere se o id mandado existe mesmo no banco.
+    # Se alguém digitar ?categoria=abc ou ?categoria=999 na URL, o is_valid() recusa e não dá erro na página.
+    categoria = forms.ModelChoiceField(
+        queryset=Categoria.objects.all(), required=False, empty_label='Todas'
+    )
+    plataforma = forms.ModelChoiceField(
+        queryset=Plataforma.objects.all(), required=False, empty_label='Todas'
+    )
+    desenvolvedora = forms.ModelChoiceField(
+        queryset=Desenvolvedora.objects.order_by('nome'), required=False, empty_label='Todas'
+    )
+    # min_value=0 barra preço negativo na busca, igual ao MinValueValidator do model.
+    preco_max = forms.DecimalField(
+        required=False, min_value=0, decimal_places=2, label='Preço até (R$)'
+    )

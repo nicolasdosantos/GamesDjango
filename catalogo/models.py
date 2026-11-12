@@ -1,3 +1,7 @@
+# settings é o settings.py do projeto. Uso settings.AUTH_USER_MODEL pra apontar pro model de usuário
+# do Django (o User que vem pronto no django.contrib.auth, com username, senha, is_staff...).
+# É o jeito que a documentação recomenda em vez de importar o User direto.
+from django.conf import settings
 # MinValueValidator é um "validador" do Django: ele confere se o valor não é menor que um mínimo.
 # Usei no preço pra ninguém cadastrar jogo com preço negativo.
 from django.core.validators import MinValueValidator
@@ -129,8 +133,13 @@ class Avaliacao(models.Model):
     # Aqui faz sentido ser diferente do PROTECT, porque avaliação sem jogo não serve pra nada.
     # Com related_name='avaliacoes' eu faço jogo.avaliacoes.all() na view de detalhe.
     jogo = models.ForeignKey(Jogo, on_delete=models.CASCADE, related_name='avaliacoes')
-    # O projeto não tem login, então a pessoa só digita o nome dela.
-    nome_usuario = models.CharField(max_length=50)
+    # Antes a pessoa digitava o nome dela num campo de texto (nome_usuario), porque o site não tinha login.
+    # Agora que tem, a avaliação fica ligada ao usuário que estava logado quando avaliou.
+    # Também é 1:N: um usuário pode fazer várias avaliações, e cada avaliação é de um usuário só.
+    # CASCADE: se o usuário for apagado, as avaliações dele vão junto.
+    # Com related_name='avaliacoes' eu faço usuario.avaliacoes.all() na página de perfil.
+    # (A migration 0005 passou as avaliações antigas pra usuários com o mesmo nome, ver o arquivo dela.)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='avaliacoes')
     # PositiveSmallIntegerField = inteiro positivo pequeno, que basta pra uma nota de 1 a 5.
     # choices=NOTAS faz o formulário mostrar um select com só essas 5 opções,
     # e o is_valid() recusa qualquer valor fora da lista (tipo nota 10 ou 0).
@@ -146,6 +155,36 @@ class Avaliacao(models.Model):
         verbose_name = 'avaliação'
         verbose_name_plural = 'avaliações'
 
-    # Retorna algo como "Minecraft - nota 5 (João)". O {self.jogo} usa o __str__ do Jogo.
+    # Retorna algo como "Minecraft - nota 5 (joao)". O {self.jogo} usa o __str__ do Jogo
+    # e o {self.usuario} usa o __str__ do User, que é o username.
     def __str__(self):
-        return f'{self.jogo} - nota {self.nota} ({self.nome_usuario})'
+        return f'{self.jogo} - nota {self.nota} ({self.usuario})'
+
+
+# Perfil: dados extras de cada usuário do site (uma bio e a plataforma favorita).
+# O User do Django só tem username, senha, e-mail, nome... e eu não posso mudar a tabela dele.
+# Então criei outra tabela e liguei as duas com um OneToOneField. Isso é a relação 1:1 (um pra um):
+# cada usuário tem UM perfil e cada perfil é de UM usuário.
+# O perfil é criado na view de cadastro (CadastroView) e editado na página "Meu perfil" (PerfilView).
+class Perfil(models.Model):
+    # OneToOneField é parecido com o ForeignKey, só que o banco não deixa repetir o valor
+    # (a coluna usuario_id é UNIQUE). Por isso não dá pra ter dois perfis pro mesmo usuário.
+    # CASCADE: se o usuário for apagado, o perfil dele vai junto (perfil sem usuário não serve pra nada).
+    # Com related_name='perfil' eu acesso o perfil a partir do usuário: request.user.perfil.
+    # Repara que é perfil no singular e sem .all(): como é 1:1, ele devolve um objeto só e não uma lista.
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='perfil')
+    bio = models.TextField(blank=True)
+    # A plataforma favorita é opcional, por isso null=True e blank=True.
+    # SET_NULL: se a plataforma for apagada, o perfil continua e só fica sem plataforma favorita.
+    # (O SET_NULL só funciona com null=True, porque ele precisa poder guardar NULL na coluna.)
+    plataforma_favorita = models.ForeignKey(
+        Plataforma, on_delete=models.SET_NULL, null=True, blank=True, related_name='perfis'
+    )
+
+    class Meta:
+        verbose_name = 'perfil'
+        verbose_name_plural = 'perfis'
+
+    # Retorna "Perfil de joao".
+    def __str__(self):
+        return f'Perfil de {self.usuario}'

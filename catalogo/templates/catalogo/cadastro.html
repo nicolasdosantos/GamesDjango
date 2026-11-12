@@ -1,0 +1,26 @@
+{% extends 'catalogo/base.html' %}
+{% comment %}
+    cadastro.html: página de criar conta.
+    É renderizada pela CadastroView, que manda o "form" (UserCreationForm do Django:
+    usuário, senha e confirmação da senha). A conta criada aqui é sempre de usuário comum (user).
+{% endcomment %}
+
+{% block titulo %}Criar conta - GameDex{% endblock %}
+
+{% block conteudo %}
+<section class="caixa-formulario">
+    <h1>Criar conta</h1>
+
+    <form method="post" class="formulario">
+        {% csrf_token %}
+        {# o as_div também mostra os textos de ajuda do UserCreationForm (regras da senha etc.) #}
+        {{ form.as_div }}
+
+        <div class="botoes">
+            <button type="submit" class="botao">Criar conta</button>
+        </div>
+    </form>
+
+    <p>Já tem conta? <a href="{% url 'login' %}">Entrar</a></p>
+</section>
+{% endblock %}

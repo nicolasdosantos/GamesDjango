@@ -1,175 +1,301 @@
-# Do django.shortcuts vêm três atalhos que uso em quase toda view:
-# - render: junta um template HTML com os dados e devolve a página pronta
-# - redirect: manda o navegador pra outra URL (usando o name que está no urls.py)
-# - get_object_or_404: busca um objeto no banco e, se não achar, mostra erro 404 (página não encontrada)
-from django.shortcuts import get_object_or_404, redirect, render
+# login: função do Django que "loga" o usuário (cria a sessão dele), usei no cadastro.
+from django.contrib.auth import login
+# UserCreationForm: formulário pronto do Django pra criar usuário (username, senha e confirmação da senha).
+# Ele já valida tudo: username repetido, senha fraca, as duas senhas diferentes...
+from django.contrib.auth.forms import UserCreationForm
+# Mixins de permissão. Mixin é uma classe que eu "somo" na minha view pra ganhar um comportamento pronto:
+# - LoginRequiredMixin: só deixa entrar quem está logado. Quem não está vai pra página de login.
+# - UserPassesTestMixin: só deixa entrar quem passar no teste do método test_func().
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+# get_object_or_404: busca um objeto no banco e, se não achar, mostra erro 404 (página não encontrada)
+from django.shortcuts import get_object_or_404, redirect
+# reverse monta o endereço a partir do name da URL (igual o {% url %} dos templates).
+# reverse_lazy é a mesma coisa, só que "preguiçoso": só monta o endereço quando for usar.
+# Uso ele nos atributos da classe (success_url), porque eles são lidos quando o Python carrega
+# o arquivo, e nessa hora as URLs ainda não foram carregadas. O reverse normal ia dar erro ali.
+from django.urls import reverse, reverse_lazy
+# As views genéricas do Django. Cada uma já faz um tipo de página comum:
+# - TemplateView: só mostra um template
+# - ListView: mostra uma lista de objetos
+# - DetailView: mostra um objeto só
+# - CreateView / UpdateView / DeleteView: cadastrar, editar e excluir com formulário
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
-from .forms import AvaliacaoForm, JogoForm
-from .models import Jogo
+from .forms import AvaliacaoForm, FiltroJogoForm, JogoForm, PerfilForm
+from .models import Avaliacao, Jogo, Perfil
 
 
-# View = função que recebe um pedido do navegador (o "request") e devolve uma resposta (uma página).
-# Essa resposta é um HttpResponse. O render() monta um com o HTML pronto, e o redirect() monta
-# um que manda o navegador ir pra outro endereço (código 302).
+# View = o código que recebe um pedido do navegador (o "request") e devolve uma resposta (uma página).
 # O urls.py é quem decide qual view roda pra cada endereço.
-# Todas as views aqui são funções (FBV, function-based views), que é o jeito mais simples de fazer.
+#
+# Antes as views eram funções (FBV, function-based views). A atividade pede views baseadas em classe
+# (CBV, class-based views), então troquei todas. A diferença:
+# - Na função eu escrevia tudo na mão: if request.method == 'POST', form.is_valid(), form.save(), render...
+# - Na classe eu herdo de uma view genérica do Django que já faz esse caminho todo. Eu só digo
+#   o model, o form e o template, e sobrescrevo (escrevo de novo) só os métodos que precisam ser diferentes.
+# No urls.py a classe é ligada com .as_view(), que transforma a classe numa função que o Django sabe chamar.
+#
+# Níveis de usuário do site:
+# - visitante (não logado): só vê os jogos
+# - user (usuário comum, cadastrado pelo site): vê os jogos, avalia e edita o próprio perfil
+# - admin (usuário com is_staff=True): faz tudo do user e ainda cadastra, edita e exclui jogos.
+#   O is_staff é o mesmo campo que libera a entrada no /admin/ do Django.
 
 
-# inicio: página inicial do site.
+# AdminRequiredMixin: mixin que eu criei pra liberar uma página só pro admin.
+# Uso ele nas views de cadastrar, editar e excluir jogo.
+# Ele herda do UserPassesTestMixin, que roda o test_func() antes da view:
+# - se retornar True, a página abre normalmente
+# - se retornar False e a pessoa NÃO está logada, ela vai pra página de login
+# - se retornar False e a pessoa está logada (é um user comum), aparece erro 403 (acesso proibido)
+# Essa checagem é o que protege de verdade. Esconder o botão no template não basta, porque a pessoa
+# poderia digitar /jogos/1/excluir/ direto na barra de endereço.
+class AdminRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        # request.user é o usuário logado (ou um "AnonymousUser" quando ninguém está logado,
+        # que sempre tem is_staff=False). Então visitante e user comum não passam.
+        return self.request.user.is_staff
+
+
+# InicioView: página inicial do site.
 # Roda quando a pessoa acessa "/" (a raiz do site).
-# Retorna o template inicio.html com os 3 jogos mais recentes.
-def inicio(request):
-    # Jogo.objects é o "gerenciador" do model, é por ele que o ORM faz as buscas no banco.
-    # ORM = o Django traduz esse código Python pra SQL, então eu não escrevo SQL na mão.
-    # O resultado é um QuerySet, que é tipo uma lista de jogos vinda do banco.
-    # order_by('-id'): o "-" é ordem decrescente, então o id maior (cadastrado por último) vem primeiro.
-    # [:3] limita a 3 resultados. O Django transforma isso em LIMIT 3 no SQL e não traz todos os jogos.
-    destaques = Jogo.objects.all().order_by('-id')[:3]
-    # O dicionário é o "contexto": as variáveis que o template vai poder usar.
-    # Lá no HTML eu acesso com {{ destaques }} ou {% for jogo in destaques %}.
-    return render(request, 'catalogo/inicio.html', {'destaques': destaques})
+# TemplateView só mostra um template. Eu sobrescrevi o get_context_data pra mandar os jogos em destaque.
+class InicioView(TemplateView):
+    template_name = 'catalogo/inicio.html'
+
+    # get_context_data monta o "contexto": as variáveis que o template vai poder usar.
+    # O **kwargs recebe o que vier da URL, e o super() traz o contexto que o Django já monta sozinho.
+    # Eu só acrescento a minha variável e devolvo o dicionário.
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Jogo.objects é o "gerenciador" do model, é por ele que o ORM faz as buscas no banco.
+        # ORM = o Django traduz esse código Python pra SQL, então eu não escrevo SQL na mão.
+        # order_by('-id'): o "-" é ordem decrescente, então o id maior (cadastrado por último) vem primeiro.
+        # [:3] limita a 3 resultados. O Django transforma isso em LIMIT 3 no SQL e não traz todos os jogos.
+        context['destaques'] = Jogo.objects.all().order_by('-id')[:3]
+        return context
 
 
-# lista_jogos: mostra todos os jogos do catálogo.
-# Roda quando acessa "/jogos/".
-# Retorna o template lista_jogos.html com os jogos em ordem alfabética.
-def lista_jogos(request):
-    # all() traz todos os registros e order_by('titulo') ordena de A a Z.
-    jogos = Jogo.objects.all().order_by('titulo')
-    return render(request, 'catalogo/lista_jogos.html', {'jogos': jogos})
+# ListaJogosView: mostra os jogos do catálogo, com os filtros de pesquisa.
+# Roda quando acessa "/jogos/". Com filtro a URL fica tipo "/jogos/?titulo=zelda&plataforma=2".
+# A ListView busca a lista no get_queryset() e manda pro template com o nome do context_object_name.
+class ListaJogosView(ListView):
+    model = Jogo
+    template_name = 'catalogo/lista_jogos.html'
+    # Sem isso a lista ia se chamar "object_list" (ou "jogo_list") no template. Com "jogos" fica mais claro.
+    context_object_name = 'jogos'
+
+    # get_queryset: decide QUAIS jogos aparecem. É aqui que os filtros entram.
+    def get_queryset(self):
+        # Começo com todos os jogos em ordem alfabética e vou "afunilando" com cada filtro preenchido.
+        # O QuerySet só vai pro banco quando é usado de verdade, então cada .filter() aqui
+        # só acrescenta uma condição no WHERE do SQL, sem fazer uma busca nova por filtro.
+        jogos = Jogo.objects.all().order_by('titulo')
+
+        # Os filtros chegam pelo request.GET (os parâmetros depois do "?" na URL).
+        # Uso GET e não POST porque buscar não muda nada no banco, e assim o link com o filtro
+        # pode ser salvo ou compartilhado. Passo pro FiltroJogoForm pra ele conferir os valores.
+        self.form_filtro = FiltroJogoForm(self.request.GET)
+
+        # Se algum valor for inválido (ex: ?preco_max=abc), o is_valid() dá False e eu mostro
+        # a lista sem filtro, com a mensagem de erro do lado do campo.
+        if self.form_filtro.is_valid():
+            # cleaned_data: os valores já conferidos. Nos ModelChoiceField ele já vem como objeto
+            # (uma Categoria, uma Plataforma...) e não como o id em texto.
+            dados = self.form_filtro.cleaned_data
+
+            # Cada if só aplica o filtro se o campo foi preenchido (campo vazio vem como '' ou None).
+            if dados['titulo']:
+                # titulo__icontains = "o título contém esse texto", sem ligar pra maiúscula/minúscula.
+                # Vira um LIKE '%zelda%' no SQL. Então "zel" já acha "The Legend of Zelda".
+                # O ORM manda o texto separado do SQL, então não tem como fazer SQL injection pela busca.
+                jogos = jogos.filter(titulo__icontains=dados['titulo'])
+            if dados['categoria']:
+                # categorias é ManyToMany. O filter por ele traz os jogos que têm essa categoria
+                # (o Django faz o JOIN com a tabela do meio sozinho).
+                jogos = jogos.filter(categorias=dados['categoria'])
+            if dados['plataforma']:
+                jogos = jogos.filter(plataforma=dados['plataforma'])
+            if dados['desenvolvedora']:
+                jogos = jogos.filter(desenvolvedora=dados['desenvolvedora'])
+            # Aqui eu comparo com "is not None" e não só "if", porque preço 0 é um filtro válido
+            # (mostrar só os gratuitos), e 0 contaria como falso num if normal.
+            if dados['preco_max'] is not None:
+                # preco__lte = "preço menor ou igual a" (lte = less than or equal).
+                jogos = jogos.filter(preco__lte=dados['preco_max'])
+
+        return jogos
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Mando o formulário de filtro pro template desenhar os campos.
+        # Como ele foi criado com o request.GET, os campos já aparecem com o que a pessoa buscou.
+        context['form_filtro'] = self.form_filtro
+        return context
 
 
-# detalhe_jogo: mostra a página de um jogo específico com as avaliações dele.
-# Roda quando acessa "/jogos/<id>/", tipo "/jogos/5/".
-# O "id" vem da própria URL: o <int:id> do urls.py pega o número e passa pra cá.
-# Retorna o template detalhe_jogo.html com o jogo e as avaliações.
-def detalhe_jogo(request, id):
-    # Usei get_object_or_404 e não Jogo.objects.get() porque o get() dá erro 500 (erro do servidor)
-    # quando o jogo não existe, por exemplo se alguém digitar /jogos/999/.
-    # Com o get_object_or_404 aparece só "página não encontrada", que é o certo nesse caso.
-    # Usei get e não filter porque quero UM jogo só. O filter() sempre devolve um QuerySet (uma lista).
-    jogo = get_object_or_404(Jogo, id=id)
-    # jogo.avaliacoes funciona por causa do related_name='avaliacoes' que coloquei no ForeignKey do model Avaliacao.
-    # Ele traz só as avaliações DESTE jogo, e o '-data' deixa as mais novas primeiro.
-    avaliacoes = jogo.avaliacoes.all().order_by('-data')
-    return render(request, 'catalogo/detalhe_jogo.html', {
-        'jogo': jogo,
-        'avaliacoes': avaliacoes,
-    })
+# DetalheJogoView: mostra a página de um jogo específico com as avaliações dele.
+# Roda quando acessa "/jogos/<pk>/", tipo "/jogos/5/".
+# A DetailView pega o <int:pk> da URL e busca o jogo sozinha. Se não existir, ela já dá 404
+# (é o mesmo que eu fazia antes com o get_object_or_404).
+class DetalheJogoView(DetailView):
+    model = Jogo
+    template_name = 'catalogo/detalhe_jogo.html'
+    context_object_name = 'jogo'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # self.object é o jogo que a DetailView buscou.
+        # jogo.avaliacoes funciona por causa do related_name='avaliacoes' no ForeignKey do model Avaliacao.
+        # select_related('usuario') já traz o usuário de cada avaliação no mesmo SQL (com JOIN).
+        # Sem ele, o template ia fazer uma consulta nova no banco pra cada avaliação, só pra mostrar o nome.
+        context['avaliacoes'] = self.object.avaliacoes.select_related('usuario').order_by('-data')
+        return context
 
 
-# novo_jogo: cadastra um jogo novo.
-# Roda quando acessa "/jogos/novo/". A mesma view cuida de duas situações:
-# - GET (a pessoa só abriu a página): mostra o formulário vazio
-# - POST (a pessoa clicou em salvar): valida os dados e salva no banco
-# Se salvar, redireciona pra página do jogo novo. Se não, mostra o form_jogo.html de novo.
-def novo_jogo(request):
-    # request.method diz se o pedido foi GET ou POST.
-    # Formulário que muda dados no banco usa POST, por isso o form do template tem method="post".
-    if request.method == 'POST':
-        # request.POST tem tudo que a pessoa digitou no formulário.
-        # Passo isso pro JogoForm pra ele conferir e preencher os campos.
-        form = JogoForm(request.POST)
-        # is_valid() roda todas as validações: campo obrigatório vazio, preço negativo
-        # (por causa do MinValueValidator no model), número no lugar errado, etc.
-        if form.is_valid():
-            # Como o JogoForm é um ModelForm, o save() cria o Jogo no banco e devolve o objeto criado.
-            # Preciso dele pra saber o id do jogo novo.
-            jogo = form.save()
-            # Depois de salvar eu uso redirect e não render. Assim, se a pessoa apertar F5,
-            # o navegador não reenvia o formulário e não cadastra o jogo duas vezes.
-            # 'detalhe_jogo' é o name da URL no urls.py, e o Django monta o endereço sozinho (/jogos/<id>/).
-            return redirect('detalhe_jogo', id=jogo.id)
-        # Se o form for inválido, não entra no if e cai no render lá embaixo.
-        # O form vai junto com as mensagens de erro e com o que a pessoa já tinha digitado.
-    else:
-        # GET: só abriu a página, então mando um formulário vazio.
-        form = JogoForm()
+# NovoJogoView: cadastra um jogo novo. Só o admin entra (AdminRequiredMixin).
+# Roda quando acessa "/jogos/novo/".
+# A CreateView faz sozinha o que eu fazia na função: no GET mostra o formulário vazio, no POST
+# roda o is_valid(), e se der certo chama o form.save() e redireciona. Se der errado, mostra os erros.
+# O AdminRequiredMixin vem ANTES da CreateView na lista, porque o Python procura os métodos
+# da esquerda pra direita. Assim a checagem de permissão roda antes da página.
+class NovoJogoView(AdminRequiredMixin, CreateView):
+    model = Jogo
+    form_class = JogoForm
+    template_name = 'catalogo/form_jogo.html'
+    # extra_context = variáveis fixas que vão pro template. O form_jogo.html é usado
+    # pra cadastrar e pra editar, e o que muda é o título da página.
+    extra_context = {'titulo_pagina': 'Cadastrar jogo'}
 
-    # O mesmo template serve pra cadastrar e editar, só muda o título da página.
-    return render(request, 'catalogo/form_jogo.html', {
-        'form': form,
-        'titulo_pagina': 'Cadastrar jogo',
-    })
+    # get_success_url: pra onde ir depois de salvar. Vou pra página do jogo novo.
+    # Uso redirect (é o que a CreateView faz) e não render, assim o F5 não cadastra o jogo duas vezes.
+    # self.object é o jogo que acabou de ser salvo. Preciso do pk dele pra montar o endereço.
+    def get_success_url(self):
+        return reverse('detalhe_jogo', args=[self.object.pk])
 
 
-# editar_jogo: altera um jogo que já existe.
-# Roda quando acessa "/jogos/<id>/editar/".
-# Funciona igual ao novo_jogo, mas o formulário já vem preenchido com os dados do jogo.
-# Se salvar, redireciona pro detalhe do jogo. Se não, mostra o formulário de novo.
-def editar_jogo(request, id):
-    # aqui eu pego o jogo pela URL pra saber qual vou editar (e dá 404 se não existir)
-    jogo = get_object_or_404(Jogo, id=id)
-    # pega o título antes do is_valid(), senão aparece o título novo mesmo sem salvar
-    # (o is_valid() copia pro objeto jogo, na memória, os campos que passaram na validação, mesmo quando
-    # outro campo deu erro. Ele só não salva no banco. Então se a pessoa mudasse o título e errasse o preço,
-    # jogo.titulo já seria o título novo e a página ia mostrar "Editar jogo: <título que nem foi salvo>")
-    titulo_pagina = f'Editar jogo: {jogo.titulo}'
+# EditarJogoView: altera um jogo que já existe. Só o admin entra.
+# Roda quando acessa "/jogos/<pk>/editar/".
+# A UpdateView busca o jogo pelo pk da URL e abre o formulário já preenchido (é o instance=jogo de antes).
+class EditarJogoView(AdminRequiredMixin, UpdateView):
+    model = Jogo
+    form_class = JogoForm
+    template_name = 'catalogo/form_jogo.html'
 
-    if request.method == 'POST':
-        # O instance=jogo é o que faz ser uma edição e não um cadastro novo.
-        # Sem ele, o form.save() ia criar um segundo jogo em vez de atualizar este.
-        form = JogoForm(request.POST, instance=jogo)
-        if form.is_valid():
-            # Aqui não preciso guardar o retorno, porque já tenho o jogo e o id dele não muda.
-            form.save()
-            return redirect('detalhe_jogo', id=jogo.id)
-    else:
-        # GET: o instance=jogo faz o formulário abrir já preenchido com os dados atuais.
-        form = JogoForm(instance=jogo)
+    # get_object: busca o jogo que vai ser editado. Sobrescrevi só pra guardar o título original.
+    # O is_valid() copia pro jogo, na memória, os campos que passaram na validação, mesmo quando
+    # outro campo deu erro (ele só não salva no banco). Se a pessoa mudasse o título e errasse o preço,
+    # a página ia mostrar "Editar jogo: <título que nem foi salvo>". Guardando antes, isso não acontece.
+    def get_object(self, queryset=None):
+        jogo = super().get_object(queryset)
+        self.titulo_original = jogo.titulo
+        return jogo
 
-    return render(request, 'catalogo/form_jogo.html', {
-        'form': form,
-        'titulo_pagina': titulo_pagina,
-    })
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo_pagina'] = f'Editar jogo: {self.titulo_original}'
+        return context
+
+    def get_success_url(self):
+        return reverse('detalhe_jogo', args=[self.object.pk])
 
 
-# excluir_jogo: apaga um jogo.
-# Roda quando acessa "/jogos/<id>/excluir/".
-# - GET: mostra uma página perguntando "tem certeza?"
+# ExcluirJogoView: apaga um jogo. Só o admin entra.
+# Roda quando acessa "/jogos/<pk>/excluir/".
+# - GET: mostra a página "tem certeza?"
 # - POST: apaga de verdade e volta pra lista de jogos
-def excluir_jogo(request, id):
-    jogo = get_object_or_404(Jogo, id=id)
-
-    # Só apago no POST, nunca no GET. Se apagasse no GET, bastava abrir o link
-    # (ou clicar sem querer) pra perder o jogo. Com a página de confirmação a pessoa precisa
-    # clicar no botão, e esse formulário ainda tem o {% csrf_token %} que protege contra pedido falso.
-    if request.method == 'POST':
-        # delete() remove o jogo do banco. As avaliações dele vão junto por causa do
-        # on_delete=CASCADE que está no model Avaliacao.
-        jogo.delete()
-        # O jogo não existe mais, então não dá pra ir pro detalhe dele. Volto pra lista.
-        return redirect('lista_jogos')
-
-    # Se chegou aqui é GET, então mostro a página de confirmação.
-    return render(request, 'catalogo/confirmar_exclusao.html', {'jogo': jogo})
+# A DeleteView só apaga no POST, nunca no GET. Se apagasse no GET, bastava abrir o link pra perder o jogo.
+class ExcluirJogoView(AdminRequiredMixin, DeleteView):
+    model = Jogo
+    template_name = 'catalogo/confirmar_exclusao.html'
+    context_object_name = 'jogo'
+    # Depois de apagar o jogo não existe mais, então volto pra lista.
+    # Aqui é reverse_lazy porque é um atributo da classe (ver explicação lá no import).
+    # As avaliações do jogo vão junto por causa do on_delete=CASCADE no model Avaliacao.
+    success_url = reverse_lazy('lista_jogos')
 
 
-# avaliar_jogo: deixa uma avaliação (nota + comentário) em um jogo.
-# Roda quando acessa "/jogos/<id>/avaliar/".
-# Se salvar, volta pro detalhe do jogo, onde a avaliação nova já aparece.
-# Se não, mostra o form_avaliacao.html de novo com os erros.
-def avaliar_jogo(request, id):
-    # Busco o jogo pela URL, porque a avaliação precisa saber de qual jogo ela é.
-    jogo = get_object_or_404(Jogo, id=id)
+# AvaliarJogoView: deixa uma avaliação (nota + comentário) em um jogo. Precisa estar logado.
+# Roda quando acessa "/jogos/<pk>/avaliar/".
+# Se a pessoa não estiver logada, o LoginRequiredMixin manda pra página de login e,
+# depois de entrar, ela volta pra cá (o Django coloca ?next=/jogos/5/avaliar/ na URL do login).
+class AvaliarJogoView(LoginRequiredMixin, CreateView):
+    model = Avaliacao
+    form_class = AvaliacaoForm
+    template_name = 'catalogo/form_avaliacao.html'
 
-    if request.method == 'POST':
-        form = AvaliacaoForm(request.POST)
-        if form.is_valid():
-            # O AvaliacaoForm não tem o campo "jogo" (a pessoa não escolhe o jogo, ele vem da URL).
-            # Se eu desse save() direto ia dar erro, porque o jogo é obrigatório no banco.
-            # commit=False cria o objeto Avaliacao mas ainda não salva no banco.
-            avaliacao = form.save(commit=False)
-            # Aí eu ligo a avaliação ao jogo certo...
-            avaliacao.jogo = jogo
-            # ...e só agora salvo de verdade. A data entra sozinha por causa do auto_now_add.
-            avaliacao.save()
-            return redirect('detalhe_jogo', id=jogo.id)
-    else:
-        form = AvaliacaoForm()
+    # dispatch é o primeiro método que roda na view, antes do get ou do post.
+    # Busco o jogo aqui uma vez só, porque preciso dele no form_valid (pra ligar a avaliação)
+    # e no get_context_data (pra mostrar o nome do jogo). Se não existir, dá 404.
+    # self.kwargs são as partes da URL, então self.kwargs['pk'] é o número do <int:pk>.
+    def dispatch(self, request, *args, **kwargs):
+        self.jogo = get_object_or_404(Jogo, pk=self.kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
 
-    # Mando o jogo junto porque o template mostra "Avaliar <nome do jogo>".
-    return render(request, 'catalogo/form_avaliacao.html', {
-        'form': form,
-        'jogo': jogo,
-    })
+    # form_valid roda quando o is_valid() deu certo, logo antes de salvar.
+    # O AvaliacaoForm não tem os campos "jogo" e "usuario", então eu coloco os dois aqui.
+    # form.instance é a Avaliacao que o formulário vai salvar.
+    def form_valid(self, form):
+        form.instance.jogo = self.jogo
+        # O usuário é sempre quem está logado. Assim ninguém consegue avaliar no nome de outra pessoa.
+        form.instance.usuario = self.request.user
+        # O super().form_valid() é quem salva no banco e faz o redirect pro get_success_url.
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Mando o jogo porque o template mostra "Avaliar <nome do jogo>".
+        context['jogo'] = self.jogo
+        return context
+
+    # Depois de avaliar, volto pro detalhe do jogo, onde a avaliação nova já aparece.
+    def get_success_url(self):
+        return reverse('detalhe_jogo', args=[self.jogo.pk])
+
+
+# CadastroView: cria uma conta nova de usuário comum (nível "user").
+# Roda quando acessa "/cadastro/".
+# É uma CreateView com o UserCreationForm do Django. O usuário criado aqui tem is_staff=False,
+# então ele nunca vira admin pelo site. Admin só é criado pelo createsuperuser ou pelo próprio /admin/.
+class CadastroView(CreateView):
+    form_class = UserCreationForm
+    template_name = 'catalogo/cadastro.html'
+    success_url = reverse_lazy('inicio')
+
+    def form_valid(self, form):
+        # form.save() cria o usuário no banco (com a senha criptografada) e devolve ele.
+        usuario = form.save()
+        # Crio o perfil junto, pra todo usuário novo já ter o seu (relação 1:1).
+        Perfil.objects.create(usuario=usuario)
+        # Já deixo a pessoa logada, pra ela não ter que digitar a senha de novo logo depois de cadastrar.
+        login(self.request, usuario)
+        return redirect(self.success_url)
+
+
+# PerfilView: página "Meu perfil", onde a pessoa vê os dados dela e edita a bio e a plataforma favorita.
+# Roda quando acessa "/perfil/". Precisa estar logado.
+# Repara que a URL não tem id: a página sempre mostra o perfil de quem está logado.
+# Assim ninguém consegue abrir ou editar o perfil de outra pessoa trocando o número na URL.
+class PerfilView(LoginRequiredMixin, UpdateView):
+    form_class = PerfilForm
+    template_name = 'catalogo/perfil.html'
+    success_url = reverse_lazy('perfil')
+
+    # get_object: normalmente a UpdateView busca pelo pk da URL. Aqui eu troquei pra buscar
+    # o perfil do usuário logado (request.user).
+    # get_or_create busca o perfil e, se não existir, cria. Precisei disso porque usuários criados
+    # fora do site (o admin do createsuperuser, ou um usuário criado no /admin/) não passam pela
+    # CadastroView e ficam sem perfil. Ele devolve dois valores: o objeto e se foi criado agora (True/False).
+    # O "_" é só um nome pra variável que eu não vou usar.
+    def get_object(self, queryset=None):
+        perfil, _ = Perfil.objects.get_or_create(usuario=self.request.user)
+        return perfil
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # As avaliações que essa pessoa já fez, usando o related_name='avaliacoes' do ForeignKey usuario.
+        # select_related('jogo') traz o jogo de cada avaliação no mesmo SQL.
+        context['minhas_avaliacoes'] = (
+            self.request.user.avaliacoes.select_related('jogo').order_by('-data')
+        )
+        return context

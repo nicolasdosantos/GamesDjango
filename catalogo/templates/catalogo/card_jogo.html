@@ -27,7 +27,7 @@
         <div class="card-rodape">
             {# preço 0 conta como "falso" no if, então jogo com preço 0 aparece como "Gratuito" #}
             <span class="preco">{% if jogo.preco %}R$ {{ jogo.preco }}{% else %}Gratuito{% endif %}</span>
-            {# {% url 'detalhe_jogo' jogo.id %} passa o id pro <int:id> da URL e vira /jogos/<id>/ #}
+            {# {% url 'detalhe_jogo' jogo.id %} passa o id pro <int:pk> da URL e vira /jogos/<id>/ #}
             <a href="{% url 'detalhe_jogo' jogo.id %}" class="botao botao-pequeno">Ver detalhes</a>
         </div>
     </div>

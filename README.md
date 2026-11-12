@@ -2,7 +2,7 @@
 
 Catálogo de jogos feito em **Django**: projeto acadêmico do curso de Análise e Desenvolvimento de Sistemas.
 
-Dá para navegar pelos jogos, cadastrar, editar e excluir títulos e deixar avaliações com nota de 1 a 5. Desenvolvedoras, categorias e plataformas são gerenciadas pelo painel administrativo do Django.
+Dá para pesquisar jogos com filtros, criar uma conta, avaliar com nota de 1 a 5 e manter um perfil. O site tem dois níveis de acesso: o **admin** cadastra, edita e exclui jogos, e o **usuário comum** avalia e edita o próprio perfil. Desenvolvedoras, categorias e plataformas são gerenciadas pelo painel administrativo do Django.
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6.1-092E20?logo=django&logoColor=white)
@@ -14,6 +14,7 @@ Dá para navegar pelos jogos, cadastrar, editar e excluir títulos e deixar aval
 ## 📑 Sumário
 
 - [Funcionalidades](#-funcionalidades)
+- [Níveis de acesso](#-níveis-de-acesso)
 - [Tecnologias](#-tecnologias)
 - [Modelo de dados](#-modelo-de-dados)
 - [Estrutura do projeto](#-estrutura-do-projeto)
@@ -21,6 +22,7 @@ Dá para navegar pelos jogos, cadastrar, editar e excluir títulos e deixar aval
 - [Pré-requisitos](#-pré-requisitos)
 - [Instalação](#-instalação)
 - [Conferir se ficou tudo certo](#-conferir-se-ficou-tudo-certo)
+- [Testes automáticos](#-testes-automáticos)
 - [Deu erro?](#️-deu-erro)
 - [Endereços e logins](#-endereços-e-logins)
 - [Usar o SQLite](#️-usar-o-sqlite-em-vez-do-mysql-sem-instalar-mysql)
@@ -30,13 +32,26 @@ Dá para navegar pelos jogos, cadastrar, editar e excluir títulos e deixar aval
 ## ✨ Funcionalidades
 
 - **Página inicial** com os últimos jogos cadastrados
-- **Lista de jogos** em cards
+- **Lista de jogos com filtros de pesquisa**: título, categoria, plataforma, desenvolvedora e preço máximo
 - **Detalhes do jogo**: desenvolvedora, plataforma, categorias, preço e avaliações
-- **CRUD de jogos**: cadastrar, editar e excluir (com página de confirmação)
-- **Avaliações** com nota de 1 (Péssimo) a 5 (Excelente) e comentário
-- **Painel admin** do Django para Desenvolvedoras, Categorias, Plataformas, Jogos e Avaliações
+- **CRUD de jogos** (só admin): cadastrar, editar e excluir, com página de confirmação
+- **Contas de usuário**: criar conta, entrar e sair
+- **Avaliações** (precisa estar logado) com nota de 1 (Péssimo) a 5 (Excelente) e comentário
+- **Meu perfil**: bio, plataforma favorita e a lista das avaliações feitas
+- **Views baseadas em classe** (`ListView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`, `TemplateView`)
+- **Painel admin** do Django para Desenvolvedoras, Categorias, Plataformas, Jogos, Avaliações e Perfis
 - Tema escuro com CSS próprio, sem frameworks
 - Código **comentado em português** para estudo, com o guia [`GUIA_ESTUDO.md`](GUIA_ESTUDO.md)
+
+## 🔐 Níveis de acesso
+
+| Nível | Quem é | O que pode fazer |
+|---|---|---|
+| Visitante | não está logado | ver o início, a lista (com filtros) e os detalhes dos jogos |
+| **User** | conta criada em `/cadastro/` | tudo do visitante + avaliar jogos + editar o próprio perfil |
+| **Admin** | usuário com `is_staff` (ex.: `admin`) | tudo do user + cadastrar, editar e excluir jogos + painel `/admin/` |
+
+O bloqueio é feito nas views (`LoginRequiredMixin` e um `AdminRequiredMixin` próprio), não só escondendo botões: um user que abrir `/jogos/1/editar/` direto recebe a página **403 – Acesso negado**. Para transformar um user em admin, marque **Membro da equipe** no cadastro dele em `/admin/`.
 
 ## 🧰 Tecnologias
 
@@ -55,6 +70,9 @@ erDiagram
     PLATAFORMA ||--o{ JOGO : "roda"
     JOGO }o--o{ CATEGORIA : "pertence"
     JOGO ||--o{ AVALIACAO : "recebe"
+    USER ||--o{ AVALIACAO : "escreve"
+    USER ||--|| PERFIL : "tem"
+    PLATAFORMA |o--o{ PERFIL : "favorita de"
 
     DESENVOLVEDORA {
         string nome
@@ -75,8 +93,14 @@ erDiagram
         int ano_lancamento
         decimal preco
     }
+    USER {
+        string username
+        bool is_staff
+    }
+    PERFIL {
+        text bio
+    }
     AVALIACAO {
-        string nome_usuario
         int nota
         text comentario
         date data
@@ -88,7 +112,12 @@ erDiagram
 | Desenvolvedora → Jogo | 1:N | `ForeignKey` com `PROTECT` (não deixa apagar uma desenvolvedora que tem jogos) |
 | Plataforma → Jogo | 1:N | `ForeignKey` com `PROTECT` |
 | Jogo → Avaliação | 1:N | `ForeignKey` com `CASCADE` (apagar o jogo apaga as avaliações dele) |
+| Usuário → Avaliação | 1:N | `ForeignKey` com `CASCADE` (cada avaliação é de quem estava logado) |
+| Plataforma → Perfil | 1:N | `ForeignKey` com `SET_NULL` (plataforma favorita, opcional) |
+| **Usuário ↔ Perfil** | **1:1** | `OneToOneField` com `CASCADE` (cada usuário tem um perfil só) |
 | Jogo ↔ Categoria | N:N | `ManyToManyField` (o Django cria a tabela intermediária) |
+
+`User` é o model de usuário que já vem no Django (`django.contrib.auth`).
 
 ## 📁 Estrutura do projeto
 
@@ -98,12 +127,15 @@ erDiagram
 ├── catalogo/                # app principal
 │   ├── migrations/          # histórico de alterações do banco
 │   ├── static/catalogo/css/ # style.css
-│   ├── templates/catalogo/  # páginas HTML (base, lista, detalhe, formulários...)
+│   ├── templates/
+│   │   ├── 403.html         # página de acesso negado
+│   │   └── catalogo/        # páginas HTML (base, lista, detalhe, formulários, login, perfil...)
 │   ├── admin.py             # registro dos models no painel admin
-│   ├── forms.py             # JogoForm e AvaliacaoForm (ModelForms)
-│   ├── models.py            # Jogo, Categoria, Desenvolvedora, Plataforma, Avaliacao
+│   ├── forms.py             # JogoForm, AvaliacaoForm, PerfilForm e FiltroJogoForm
+│   ├── models.py            # Jogo, Categoria, Desenvolvedora, Plataforma, Avaliacao, Perfil
+│   ├── tests.py             # testes automáticos (níveis de acesso e filtros)
 │   ├── urls.py              # rotas do app
-│   └── views.py             # lógica de cada página
+│   └── views.py             # views baseadas em classe
 ├── gamedex/                 # configurações do projeto (settings.py, urls.py...)
 ├── GUIA_ESTUDO.md           # guia de estudo do código
 ├── manage.py
@@ -112,16 +144,19 @@ erDiagram
 
 ## 🧭 Rotas
 
-| URL | Página |
-|---|---|
-| `/` | Início |
-| `/jogos/` | Lista de jogos |
-| `/jogos/novo/` | Cadastrar jogo |
-| `/jogos/<id>/` | Detalhes do jogo |
-| `/jogos/<id>/editar/` | Editar jogo |
-| `/jogos/<id>/excluir/` | Excluir jogo |
-| `/jogos/<id>/avaliar/` | Avaliar jogo |
-| `/admin/` | Painel administrativo |
+| URL | Página | Acesso |
+|---|---|---|
+| `/` | Início | todos |
+| `/jogos/` | Lista de jogos com filtros (ex.: `/jogos/?titulo=zelda&preco_max=300`) | todos |
+| `/jogos/<id>/` | Detalhes do jogo | todos |
+| `/jogos/novo/` | Cadastrar jogo | admin |
+| `/jogos/<id>/editar/` | Editar jogo | admin |
+| `/jogos/<id>/excluir/` | Excluir jogo | admin |
+| `/jogos/<id>/avaliar/` | Avaliar jogo | logado |
+| `/cadastro/` | Criar conta | todos |
+| `/login/` e `/logout/` | Entrar e sair | todos |
+| `/perfil/` | Meu perfil | logado |
+| `/admin/` | Painel administrativo | admin |
 
 ---
 
@@ -171,7 +206,7 @@ pip install -r requirements.txt
 python manage.py runserver
 ```
 
-Depois é só abrir http://127.0.0.1:8000/ (admin: `admin` / `admin123`).
+Depois é só abrir http://127.0.0.1:8000/ (admin: `admin` / `admin123`, user: `usuario` / `usuario123`).
 
 Se é a primeira vez, siga o passo a passo abaixo.
 
@@ -235,7 +270,10 @@ Deixe esse terminal aberto enquanto usa o site. Para desligar, aperte `Ctrl + C`
 | Site | http://127.0.0.1:8000/ |
 | Painel admin | http://127.0.0.1:8000/admin/ |
 
-Login do admin: usuário **admin**, senha **admin123**.
+| Nível | Usuário | Senha |
+|---|---|---|
+| Admin | `admin` | `admin123` |
+| User | `usuario` | `usuario123` |
 
 ---
 
@@ -244,10 +282,24 @@ Login do admin: usuário **admin**, senha **admin123**.
 - [ ] A página inicial abre e mostra "Últimos jogos cadastrados" com 3 jogos.
 - [ ] Em **Jogos** aparecem 8 jogos (Minecraft, Zelda, Elden Ring...).
 - [ ] Em **Elden Ring** aparecem as categorias **Ação**, **RPG** e **Mundo aberto**, com os acentos certos, e 2 avaliações.
-- [ ] Dá para cadastrar um jogo novo, editar e excluir.
-- [ ] O admin entra com `admin` / `admin123` e mostra Jogos, Categorias, Plataformas, Desenvolvedoras e Avaliações.
+- [ ] Em **Jogos**, filtrar por **Preço até 200** mostra 3 jogos.
+- [ ] Sem login, o botão do jogo é **Entre para avaliar** e não aparecem Editar/Excluir.
+- [ ] Entrando com `usuario` / `usuario123`: dá para avaliar e editar o **Meu perfil**, e abrir `/jogos/1/editar/` mostra **Acesso negado**.
+- [ ] Entrando com `admin` / `admin123`: dá para cadastrar, editar e excluir jogos, e o `/admin/` mostra Jogos, Categorias, Plataformas, Desenvolvedoras, Avaliações e Perfis.
 
 **Nas próximas vezes**, só precisa ativar a venv (passo 3) e rodar `python manage.py runserver` (passo 6), com o MySQL ligado.
+
+---
+
+## 🧪 Testes automáticos
+
+Com a venv ativada e o MySQL ligado:
+
+```bash
+python manage.py test catalogo
+```
+
+São 12 testes (`catalogo/tests.py`) que conferem os níveis de acesso, o cadastro com perfil e os filtros. O Django cria um banco separado (`test_gamedex`) só para os testes e apaga no final, então os dados do site não são alterados.
 
 ---
 
@@ -306,6 +358,7 @@ Confira se a pasta `catalogo/static/` existe e se o servidor foi ligado com `pyt
 |---|---|
 | Site | http://127.0.0.1:8000/ |
 | Admin | http://127.0.0.1:8000/admin/ (usuário `admin`, senha `admin123`) |
+| Usuário comum | `usuario`, senha `usuario123` |
 | Banco no MySQL | `gamedex` |
 | Usuário do MySQL usado pelo projeto | `gamedex`, senha `Gamedex@2026` (criado pelo script) |
 
@@ -320,7 +373,7 @@ Se não quiser (ou não conseguir) instalar o MySQL, o projeto também roda com 
 4. Coloque `#` no começo de todas as linhas do bloco **MySQL** (de `DATABASES = {` até o `}` final dele).
 5. Rode `python manage.py runserver` normalmente.
 
-O usuário admin do SQLite é outro, com a senha que já existia nele. Se não lembrar a senha, rode `python manage.py changepassword admin`.
+O usuário admin do SQLite é outro, com a senha que já existia nele. Se não lembrar a senha, rode `python manage.py changepassword admin`. O usuário comum `usuario` só existe no MySQL: no SQLite, crie uma conta em `/cadastro/`.
 
 ---
 

@@ -1,7 +1,7 @@
 {% extends 'catalogo/base.html' %}
 {% comment %}
     detalhe_jogo.html: página com todas as informações de um jogo e as avaliações dele.
-    É renderizada pela view detalhe_jogo, que manda as variáveis "jogo" e "avaliacoes".
+    É renderizada pela DetalheJogoView, que manda as variáveis "jogo" e "avaliacoes".
     Pelo extends ela usa o base.html e só preenche os blocks titulo e conteudo.
 {% endcomment %}
 
@@ -49,12 +49,26 @@
         {% endfor %}
     </div>
 
-    {# os três botões passam o id do jogo pra URL, pra view saber qual jogo avaliar, editar ou excluir #}
+    {% comment %}
+        Os botões mudam conforme o nível do usuário:
+        - logado (user ou admin): pode avaliar
+        - visitante: vê um link pra entrar. O ?next= faz o login voltar pra cá depois de entrar
+          (request.path é o endereço desta página, tipo /jogos/5/).
+        - admin: também vê editar e excluir
+        Mesmo que alguém abra o endereço de editar/excluir na mão, a view bloqueia (AdminRequiredMixin).
+    {% endcomment %}
     <div class="botoes">
+        {% if user.is_authenticated %}
         <a href="{% url 'avaliar_jogo' jogo.id %}" class="botao">Avaliar jogo</a>
+        {% else %}
+        <a href="{% url 'login' %}?next={{ request.path }}" class="botao">Entre para avaliar</a>
+        {% endif %}
+
+        {% if user.is_staff %}
         <a href="{% url 'editar_jogo' jogo.id %}" class="botao botao-secundario">Editar</a>
         {# esse link só abre a página de confirmação (GET). Quem apaga mesmo é o formulário de lá #}
         <a href="{% url 'excluir_jogo' jogo.id %}" class="botao botao-perigo">Excluir</a>
+        {% endif %}
     </div>
 </section>
 
@@ -65,7 +79,8 @@
     {% for avaliacao in avaliacoes %}
     <article class="avaliacao">
         <div class="avaliacao-topo">
-            <strong>{{ avaliacao.nome_usuario }}</strong>
+            {# avaliacao.usuario é o User (ForeignKey), e o .username é o nome de login dele #}
+            <strong>{{ avaliacao.usuario.username }}</strong>
             {# a classe vira "nota-1", "nota-5" etc., e o CSS usa isso pra pintar a nota de vermelho, amarelo ou verde #}
             <span class="nota nota-{{ avaliacao.nota }}">Nota: {{ avaliacao.nota }}/5</span>
         </div>

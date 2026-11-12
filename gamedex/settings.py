@@ -214,3 +214,15 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+# Login e logout
+# Configurações usadas pelas views de login do Django e pelo LoginRequiredMixin/AdminRequiredMixin.
+# Todas usam o name da URL (do catalogo/urls.py), e o Django transforma no endereço certo.
+
+# LOGIN_URL: pra onde mandar quem tenta abrir uma página que precisa de login (ex: avaliar um jogo).
+LOGIN_URL = 'login'
+# LOGIN_REDIRECT_URL: pra onde ir depois de entrar, quando a URL não tem ?next=.
+LOGIN_REDIRECT_URL = 'inicio'
+# LOGOUT_REDIRECT_URL: pra onde ir depois de sair.
+LOGOUT_REDIRECT_URL = 'inicio'

@@ -1,7 +1,7 @@
 {% extends 'catalogo/base.html' %}
 {% comment %}
     inicio.html: a página inicial do site ("/").
-    É renderizada pela view inicio, que manda a variável "destaques" (os 3 últimos jogos cadastrados).
+    É renderizada pela InicioView, que manda a variável "destaques" (os 3 últimos jogos cadastrados).
     Não preenchi o block titulo, então a aba fica com o título padrão do base.html ("GameDex").
 {% endcomment %}
 
@@ -10,11 +10,16 @@
 <section class="hero">
     <h1>GameDex</h1>
     <p class="hero-subtitulo">Seu catálogo de jogos</p>
-    <p class="hero-texto">Cadastre, organize e avalie seus jogos favoritos.</p>
+    <p class="hero-texto">Pesquise e avalie seus jogos favoritos.</p>
 
     <div class="botoes">
         <a href="{% url 'lista_jogos' %}" class="botao">Ver jogos</a>
+        {# só o admin pode cadastrar jogo, então o botão só aparece pra ele #}
+        {% if user.is_staff %}
         <a href="{% url 'novo_jogo' %}" class="botao botao-secundario">Cadastrar jogo</a>
+        {% elif not user.is_authenticated %}
+        <a href="{% url 'cadastro' %}" class="botao botao-secundario">Criar conta</a>
+        {% endif %}
     </div>
 </section>
 

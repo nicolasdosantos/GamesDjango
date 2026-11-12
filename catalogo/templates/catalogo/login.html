@@ -1,0 +1,33 @@
+{% extends 'catalogo/base.html' %}
+{% comment %}
+    login.html: página de entrar no site.
+    Quem renderiza é a LoginView, que já vem pronta no Django (ver urls.py). Ela manda o "form"
+    (AuthenticationForm, com usuário e senha) e confere a senha sozinha.
+    Se der errado, o form volta com o erro "usuário ou senha incorretos" em form.non_field_errors,
+    e o form.as_div já mostra isso.
+{% endcomment %}
+
+{% block titulo %}Entrar - GameDex{% endblock %}
+
+{% block conteudo %}
+<section class="caixa-formulario">
+    <h1>Entrar</h1>
+
+    <form method="post" class="formulario">
+        {% csrf_token %}
+        {{ form.as_div }}
+        {% comment %}
+            Quando a pessoa veio de uma página que pedia login (ex: avaliar um jogo), a URL tem ?next=/jogos/5/avaliar/.
+            Esse campo escondido manda o next junto no POST, e a LoginView volta pra essa página depois de entrar.
+            A LoginView só aceita next do próprio site, então ninguém consegue usar isso pra mandar a pessoa pra outro site.
+        {% endcomment %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="botoes">
+            <button type="submit" class="botao">Entrar</button>
+        </div>
+    </form>
+
+    <p>Ainda não tem conta? <a href="{% url 'cadastro' %}">Criar conta</a></p>
+</section>
+{% endblock %}

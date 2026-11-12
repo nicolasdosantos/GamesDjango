@@ -55,9 +55,36 @@
             <nav class="menu">
                 <a href="{% url 'inicio' %}" {% if pagina == 'inicio' %}class="ativo"{% endif %}>Início</a>
                 <a href="{% url 'lista_jogos' %}" {% if pagina == 'lista_jogos' %}class="ativo"{% endif %}>Jogos</a>
+                {% comment %}
+                    O menu muda conforme o nível de quem está acessando.
+                    user é o usuário logado. Ele está disponível em todo template por causa do context processor
+                    'auth' do settings.py. Quando ninguém está logado, user é um AnonymousUser.
+                    - user.is_staff: só o admin vê "Cadastrar jogo" e "Admin"
+                    - user.is_authenticated: quem está logado (admin ou user) vê "Meu perfil" e "Sair"
+                    Esconder o link aqui é só pra organizar a tela. Quem bloqueia de verdade é a view
+                    (AdminRequiredMixin e LoginRequiredMixin no views.py).
+                {% endcomment %}
+                {% if user.is_staff %}
                 <a href="{% url 'novo_jogo' %}" {% if pagina == 'novo_jogo' %}class="ativo"{% endif %}>Cadastrar jogo</a>
                 {# 'admin:index' tem "admin:" na frente porque as URLs do admin ficam num namespace (um grupo de nomes) chamado admin #}
                 <a href="{% url 'admin:index' %}">Admin</a>
+                {% endif %}
+
+                {% if user.is_authenticated %}
+                <a href="{% url 'perfil' %}" {% if pagina == 'perfil' %}class="ativo"{% endif %}>Meu perfil</a>
+                {% comment %}
+                    O logout precisa ser POST (a LogoutView do Django não aceita GET),
+                    então o "Sair" é um formulário com o csrf_token e um botão com cara de link.
+                {% endcomment %}
+                <form method="post" action="{% url 'logout' %}" class="form-sair">
+                    {% csrf_token %}
+                    {# o filtro yesno troca True/False por um dos dois textos: "admin" se for staff, "user" se não for #}
+                    <button type="submit">Sair ({{ user.username }} - {{ user.is_staff|yesno:"admin,user" }})</button>
+                </form>
+                {% else %}
+                <a href="{% url 'login' %}" {% if pagina == 'login' %}class="ativo"{% endif %}>Entrar</a>
+                <a href="{% url 'cadastro' %}" {% if pagina == 'cadastro' %}class="ativo"{% endif %}>Criar conta</a>
+                {% endif %}
             </nav>
         </div>
     </header>

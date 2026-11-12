@@ -7,7 +7,7 @@
 --   2. Cria o usuário "gamedex" (senha "Gamedex@2026"), com permissão só nesse banco.
 --   3. Cria TODAS as tabelas que o Django precisa: as do catálogo e as internas do Django.
 --   4. Marca todas as migrations como já aplicadas na tabela django_migrations.
---   5. Insere dados de exemplo e o superusuário admin / admin123.
+--   5. Insere dados de exemplo, o admin (admin / admin123) e um usuário comum (usuario / usuario123).
 --
 -- Como rodar (precisa ser com o root, porque cria banco e usuário):
 --   - MySQL Workbench: File > Open SQL Script, abrir este arquivo e clicar no raio (Execute).
@@ -62,6 +62,12 @@ ALTER USER 'gamedex'@'::1' IDENTIFIED BY 'Gamedex@2026';
 GRANT ALL PRIVILEGES ON gamedex.* TO 'gamedex'@'localhost';
 GRANT ALL PRIVILEGES ON gamedex.* TO 'gamedex'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gamedex.* TO 'gamedex'@'::1';
+
+-- Permissão no banco "test_gamedex", que é o banco que o "python manage.py test" cria e apaga
+-- sozinho pra rodar os testes automáticos (catalogo/tests.py). Sem isso os testes dão erro de acesso.
+GRANT ALL PRIVILEGES ON test_gamedex.* TO 'gamedex'@'localhost';
+GRANT ALL PRIVILEGES ON test_gamedex.* TO 'gamedex'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON test_gamedex.* TO 'gamedex'@'::1';
 
 -- A partir daqui, tudo é feito dentro do banco gamedex.
 USE gamedex;
@@ -256,18 +262,37 @@ CREATE TABLE `catalogo_jogo_categorias` (
   CONSTRAINT `catalogo_jogo_categorias_jogo_id_4528c2b6_fk_catalogo_jogo_id` FOREIGN KEY (`jogo_id`) REFERENCES `catalogo_jogo` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Model Avaliacao. A coluna jogo_id é o ForeignKey pro Jogo.
+-- Model Avaliacao. A coluna jogo_id é o ForeignKey pro Jogo e a usuario_id é o ForeignKey
+-- pro usuário que fez a avaliação (auth_user). As duas são relações 1:N.
 CREATE TABLE `catalogo_avaliacao` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `nome_usuario` varchar(50) NOT NULL,
   `nota` smallint unsigned NOT NULL,
   `comentario` longtext NOT NULL,
   `data` date NOT NULL,
   `jogo_id` bigint NOT NULL,
+  `usuario_id` int NOT NULL,
   PRIMARY KEY (`id`),
   KEY `catalogo_avaliacao_jogo_id_d2005725_fk_catalogo_jogo_id` (`jogo_id`),
+  KEY `catalogo_avaliacao_usuario_id_0a036ed4_fk_auth_user_id` (`usuario_id`),
   CONSTRAINT `catalogo_avaliacao_jogo_id_d2005725_fk_catalogo_jogo_id` FOREIGN KEY (`jogo_id`) REFERENCES `catalogo_jogo` (`id`),
+  CONSTRAINT `catalogo_avaliacao_usuario_id_0a036ed4_fk_auth_user_id` FOREIGN KEY (`usuario_id`) REFERENCES `auth_user` (`id`),
   CONSTRAINT `catalogo_avaliacao_chk_1` CHECK ((`nota` >= 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Model Perfil: a relação 1:1 com o usuário.
+-- O que faz ser 1:1 no banco é o UNIQUE KEY na coluna usuario_id: o mesmo usuário não pode
+-- aparecer em dois perfis. (Num ForeignKey normal, 1:N, a coluna pode repetir.)
+-- plataforma_favorita_id aceita NULL porque a plataforma favorita é opcional.
+CREATE TABLE `catalogo_perfil` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `bio` longtext NOT NULL,
+  `plataforma_favorita_id` bigint DEFAULT NULL,
+  `usuario_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `usuario_id` (`usuario_id`),
+  KEY `catalogo_perfil_plataforma_favorita__40ec32ba_fk_catalogo_` (`plataforma_favorita_id`),
+  CONSTRAINT `catalogo_perfil_plataforma_favorita__40ec32ba_fk_catalogo_` FOREIGN KEY (`plataforma_favorita_id`) REFERENCES `catalogo_plataforma` (`id`),
+  CONSTRAINT `catalogo_perfil_usuario_id_a3e7553f_fk_auth_user_id` FOREIGN KEY (`usuario_id`) REFERENCES `auth_user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -277,7 +302,7 @@ CREATE TABLE `catalogo_avaliacao` (
 -- (desenvolvedora_id, jogo_id...) apontarem pros registros certos.
 -- Depois do INSERT, o AUTO_INCREMENT continua do maior id, então os próximos cadastros não dão conflito.
 
--- Todas as migrations marcadas como aplicadas (as do Django e as 4 do catálogo).
+-- Todas as migrations marcadas como aplicadas (as do Django e as 5 do catálogo).
 -- Por causa destas linhas, depois do script o "manage.py migrate" diz "No migrations to apply".
 INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (1,'contenttypes','0001_initial','2026-10-15 17:42:07.187168');
 INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (2,'auth','0001_initial','2026-10-15 17:42:08.015532');
@@ -301,6 +326,7 @@ INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (19,'cat
 INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (20,'catalogo','0003_alter_desenvolvedora_ano_fundacao_and_more','2026-10-15 17:42:11.704442');
 INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (21,'catalogo','0004_alter_categoria_options_alter_plataforma_options','2026-10-15 17:42:11.718283');
 INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (22,'sessions','0001_initial','2026-10-15 17:42:11.997961');
+INSERT INTO `django_migrations` (`id`, `app`, `name`, `applied`) VALUES (23,'catalogo','0005_perfil_e_usuario_na_avaliacao','2026-11-12 17:33:48.642756');
 
 -- Os models registrados (normalmente o migrate cria isso sozinho no final).
 INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (1,'admin','logentry');
@@ -312,6 +338,7 @@ INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (8,'catalo
 INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (9,'catalogo','desenvolvedora');
 INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (10,'catalogo','jogo');
 INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (11,'catalogo','plataforma');
+INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (12,'catalogo','perfil');
 INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (5,'contenttypes','contenttype');
 INSERT INTO `django_content_type` (`id`, `app_label`, `model`) VALUES (6,'sessions','session');
 
@@ -360,12 +387,35 @@ INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALU
 INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (42,'Can change avaliação',7,'change_avaliacao');
 INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (43,'Can delete avaliação',7,'delete_avaliacao');
 INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (44,'Can view avaliação',7,'view_avaliacao');
+INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (45,'Can add perfil',12,'add_perfil');
+INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (46,'Can change perfil',12,'change_perfil');
+INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (47,'Can delete perfil',12,'delete_perfil');
+INSERT INTO `auth_permission` (`id`, `name`, `content_type_id`, `codename`) VALUES (48,'Can view perfil',12,'view_perfil');
 
 -- Superusuário "admin" com senha "admin123".
 -- A senha está como hash pbkdf2_sha256, gerado pelo make_password do próprio Django.
 -- Formato: algoritmo$iterações$salt$hash. Não dá pra "desfazer" o hash e descobrir a senha:
 -- no login o Django gera o hash do que foi digitado e compara.
 INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (1,'pbkdf2_sha256$1500000$Q1hsblFvfQRv0iiRIcqEH8$O+iNCsaYzRVJdnxmTnfyEDqXSL1U/6kaifU3QxEfeuc=',NULL,1,'admin','','','',1,1,'2026-10-15 17:42:13.635902');
+
+-- Usuário comum "usuario" com senha "usuario123" (is_staff = 0, então é o nível user do site).
+-- Serve pra testar o que um usuário comum pode e não pode fazer.
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (2,'pbkdf2_sha256$1500000$nHxG6ORk8wOfdm84BTYGvD$41/xfp/QiA6ztnvkw2KIlMmVzldLxneuXATAdOKEc0E=',NULL,0,'usuario','','','',0,1,'2026-11-12 12:00:00.000000');
+
+-- Os autores das avaliações de exemplo. Antes a avaliação guardava só o nome digitado, agora ela
+-- aponta pra um usuário. A senha '!' quer dizer "sem senha": ninguém consegue entrar com eles.
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (3,'!',NULL,0,'Ana','','','',0,1,'2026-11-12 12:00:00.000000');
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (4,'!',NULL,0,'Pedro','','','',0,1,'2026-11-12 12:00:00.000000');
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (5,'!',NULL,0,'Carla','','','',0,1,'2026-11-12 12:00:00.000000');
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (6,'!',NULL,0,'João','','','',0,1,'2026-11-12 12:00:00.000000');
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (7,'!',NULL,0,'Marina','','','',0,1,'2026-11-12 12:00:00.000000');
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (8,'!',NULL,0,'Lucas','','','',0,1,'2026-11-12 12:00:00.000000');
+INSERT INTO `auth_user` (`id`, `password`, `last_login`, `is_superuser`, `username`, `first_name`, `last_name`, `email`, `is_staff`, `is_active`, `date_joined`) VALUES (9,'!',NULL,0,'Beatriz','','','',0,1,'2026-11-12 12:00:00.000000');
+
+-- Perfis (relação 1:1): um pro admin e um pro usuario. Os outros usuários ganham o perfil
+-- sozinhos na primeira vez que abrirem "Meu perfil" (get_or_create na PerfilView).
+INSERT INTO `catalogo_perfil` (`id`, `bio`, `plataforma_favorita_id`, `usuario_id`) VALUES (1,'Administrador do GameDex.',1,1);
+INSERT INTO `catalogo_perfil` (`id`, `bio`, `plataforma_favorita_id`, `usuario_id`) VALUES (2,'Gosto de jogos de aventura.',3,2);
 
 -- 5 desenvolvedoras.
 INSERT INTO `catalogo_desenvolvedora` (`id`, `nome`, `pais`, `ano_fundacao`) VALUES (1,'Mojang Studios','Suécia',2009);
@@ -421,13 +471,14 @@ INSERT INTO `catalogo_jogo_categorias` (`id`, `jogo_id`, `categoria_id`) VALUES 
 INSERT INTO `catalogo_jogo_categorias` (`id`, `jogo_id`, `categoria_id`) VALUES (20,8,4);
 
 -- Algumas avaliações de exemplo em Minecraft, The Witcher 3 e Elden Ring.
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (1,'Ana',5,'Jogo há anos com meus amigos e ainda não enjoei.','2026-09-02',1);
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (2,'Pedro',4,'Muito bom, mas no começo é difícil saber o que fazer.','2026-09-20',1);
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (3,'Carla',5,'A melhor história que já vi em um jogo.','2026-08-15',5);
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (4,'João',4,'','2026-09-01',5);
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (5,'Marina',3,'Gostei da história, mas o combate é meio travado.','2026-10-03',5);
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (6,'Lucas',5,'Difícil, mas cada chefe derrotado vale a pena.','2026-09-10',8);
-INSERT INTO `catalogo_avaliacao` (`id`, `nome_usuario`, `nota`, `comentario`, `data`, `jogo_id`) VALUES (7,'Beatriz',2,'Desisti no segundo chefe. Difícil demais pra mim.','2026-10-05',8);
+-- usuario_id aponta pros usuários Ana (3), Pedro (4), Carla (5)... criados lá em cima.
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (1,5,'Jogo há anos com meus amigos e ainda não enjoei.','2026-09-02',1,3);
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (2,4,'Muito bom, mas no começo é difícil saber o que fazer.','2026-09-20',1,4);
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (3,5,'A melhor história que já vi em um jogo.','2026-08-15',5,5);
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (4,4,'','2026-09-01',5,6);
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (5,3,'Gostei da história, mas o combate é meio travado.','2026-10-03',5,7);
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (6,5,'Difícil, mas cada chefe derrotado vale a pena.','2026-09-10',8,8);
+INSERT INTO `catalogo_avaliacao` (`id`, `nota`, `comentario`, `data`, `jogo_id`, `usuario_id`) VALUES (7,2,'Desisti no segundo chefe. Difícil demais pra mim.','2026-10-05',8,9);
 
 -- Liga de novo a conferência de chave estrangeira.
 SET FOREIGN_KEY_CHECKS = 1;

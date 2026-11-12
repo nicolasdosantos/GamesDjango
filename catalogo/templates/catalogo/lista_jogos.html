@@ -1,7 +1,9 @@
 {% extends 'catalogo/base.html' %}
 {% comment %}
-    lista_jogos.html: mostra todos os jogos em cards.
-    É renderizada pela view lista_jogos, que manda a variável "jogos" já em ordem alfabética.
+    lista_jogos.html: mostra os jogos em cards, com os filtros de pesquisa em cima.
+    É renderizada pela ListaJogosView, que manda:
+    - "jogos": a lista já filtrada e em ordem alfabética
+    - "form_filtro": o FiltroJogoForm, com o que a pessoa buscou
 {% endcomment %}
 
 {% block titulo %}Jogos - GameDex{% endblock %}
@@ -9,10 +11,30 @@
 {% block conteudo %}
 <div class="cabecalho-pagina">
     <h1>Jogos</h1>
+    {% if user.is_staff %}
     <a href="{% url 'novo_jogo' %}" class="botao">Cadastrar jogo</a>
+    {% endif %}
 </div>
 
-{# se não tiver jogo nenhum, mostra uma mensagem em vez de uma área vazia #}
+{% comment %}
+    Formulário de filtros. Ele usa method="get", então os campos vão pra URL
+    (ex: /jogos/?titulo=zelda&plataforma=2) e a ListaJogosView lê pelo request.GET.
+    GET não muda nada no banco, por isso esse formulário não precisa de csrf_token.
+    action aponta pra própria lista, assim a busca sempre volta pra esta página.
+{% endcomment %}
+<form method="get" action="{% url 'lista_jogos' %}" class="formulario filtros">
+    {# desenha os 5 campos de filtro (título, categoria, plataforma, desenvolvedora e preço) #}
+    {{ form_filtro.as_div }}
+    <div class="botoes">
+        <button type="submit" class="botao">Pesquisar</button>
+        {# limpar é só abrir a lista sem nada depois do "?" #}
+        <a href="{% url 'lista_jogos' %}" class="botao botao-secundario">Limpar filtros</a>
+    </div>
+</form>
+
+{# jogos|length conta quantos jogos sobraram depois dos filtros #}
+<p class="resultado-busca">{{ jogos|length }} jogo{{ jogos|length|pluralize }} encontrado{{ jogos|length|pluralize }}</p>
+
 {% if jogos %}
 <div class="grade-cards">
     {% for jogo in jogos %}
@@ -21,6 +43,7 @@
     {% endfor %}
 </div>
 {% else %}
-<p class="vazio">Nenhum jogo cadastrado ainda.</p>
+{# aparece quando não tem jogo cadastrado ou quando nenhum jogo bate com os filtros #}
+<p class="vazio">Nenhum jogo encontrado.</p>
 {% endif %}
 {% endblock %}

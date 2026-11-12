@@ -1,6 +1,6 @@
 # Guia de estudo – GameDex
 
-Catálogo de jogos feito em Django pra atividade da faculdade. O site lista jogos, mostra os detalhes de cada um, deixa cadastrar, editar e excluir jogos e receber avaliações (nota de 1 a 5 + comentário). Categorias e plataformas são cadastradas só pelo painel admin. Desenvolvedoras podem ser cadastradas no admin, mas também são criadas sozinhas quando alguém digita um nome novo no formulário de jogo.
+Catálogo de jogos feito em Django pra atividade da faculdade. O site lista jogos com filtros de pesquisa, mostra os detalhes de cada um, deixa o **admin** cadastrar, editar e excluir jogos e deixa o **usuário logado** avaliar (nota de 1 a 5 + comentário) e editar o seu perfil. As views são todas **baseadas em classe** (CBV). Categorias e plataformas são cadastradas só pelo painel admin. Desenvolvedoras podem ser cadastradas no admin, mas também são criadas sozinhas quando alguém digita um nome novo no formulário de jogo.
 
 - **Projeto:** `gamedex` (configurações gerais)
 - **App:** `catalogo` (onde fica tudo do catálogo)
@@ -22,91 +22,141 @@ Navegador pede /jogos/5/
 gamedex/urls.py      → "admin/" não bate; '' manda pro include('catalogo.urls')
       │
       ▼
-catalogo/urls.py     → 'jogos/<int:id>/' bate, id = 5 → chama views.detalhe_jogo(request, id=5)
+catalogo/urls.py     → 'jogos/<int:pk>/' bate, pk = 5 → chama DetalheJogoView.as_view()
       │
       ▼
-catalogo/views.py    → get_object_or_404(Jogo, id=5) e jogo.avaliacoes.all()
+catalogo/views.py    → a DetailView busca o Jogo de pk=5 (404 se não existir) e o
+      │                 get_context_data() acrescenta jogo.avaliacoes
       │                 (o ORM transforma isso em SQL e busca no MySQL)
       ▼
 catalogo/models.py   → define como são as tabelas Jogo, Avaliacao etc.
       │
       ▼
-render(...)          → junta detalhe_jogo.html (que estende base.html) com os dados
+template             → a view junta detalhe_jogo.html (que estende base.html) com os dados
       │
       ▼
 Navegador recebe o HTML pronto e carrega o style.css pelo /static/
 ```
 
-Quando tem **formulário** (cadastrar, editar, avaliar), o caminho tem duas voltas:
+Quando tem **formulário** (cadastrar, editar, avaliar), o caminho tem duas voltas. Numa CreateView/UpdateView o Django faz isso sozinho, eu não escrevo o `if request.method == 'POST'`:
 
-1. **GET** – a pessoa abre a página → a view cria um form vazio (ou preenchido, na edição) → `render` mostra o formulário.
+1. **GET** – a pessoa abre a página → a view cria um form vazio (ou preenchido, na edição) e mostra o template.
 2. **POST** – a pessoa clica em Salvar → a view cria o form com `request.POST` → `is_valid()` confere tudo:
-   - **válido:** `form.save()` grava no banco e depois `redirect` manda pra outra página;
-   - **inválido:** `render` mostra o mesmo formulário com as mensagens de erro e o que já tinha sido digitado.
+   - **válido:** chama o `form_valid()`, que faz o `form.save()` e redireciona pro `get_success_url()`/`success_url`;
+   - **inválido:** chama o `form_invalid()`, que mostra o mesmo formulário com as mensagens de erro.
+
+Antes da view rodar, os **mixins de permissão** fazem a checagem (ver seção 2.1): se a pessoa não pode entrar, a view nem chega a buscar nada.
 
 ---
 
 ## 2. Arquivos do projeto
 
 ### `catalogo/models.py` – as tabelas do banco
-Define os 5 models: **Desenvolvedora, Categoria, Plataforma, Jogo e Avaliacao**. Cada classe vira uma tabela e cada atributo vira uma coluna.
+Define os 6 models: **Desenvolvedora, Categoria, Plataforma, Jogo, Avaliacao e Perfil**. Cada classe vira uma tabela e cada atributo vira uma coluna. O usuário (`User`) não está aqui: ele vem pronto do Django (`django.contrib.auth`).
 
 Relações:
 - Desenvolvedora **1:N** Jogo (`ForeignKey`, `PROTECT`)
 - Plataforma **1:N** Jogo (`ForeignKey`, `PROTECT`)
 - Jogo **N:N** Categoria (`ManyToManyField`, o Django cria a tabela do meio sozinho)
 - Jogo **1:N** Avaliacao (`ForeignKey`, `CASCADE`)
+- Usuário **1:N** Avaliacao (`ForeignKey`, `CASCADE`): quem fez a avaliação
+- Usuário **1:1** Perfil (`OneToOneField`, `CASCADE`): bio e plataforma favorita de cada usuário
+- Plataforma **1:N** Perfil (`ForeignKey`, `SET_NULL`): a plataforma favorita, opcional
+
+**1:N x 1:1:** no banco os dois viram uma coluna `_id` apontando pra outra tabela. A diferença é que no `OneToOneField` essa coluna é **UNIQUE**, então o mesmo usuário não pode ter dois perfis. No código também muda: `usuario.avaliacoes.all()` (lista) e `usuario.perfil` (um objeto só, sem `.all()`).
 
 **Conexões:** as mudanças aqui viram arquivos em `migrations/` (makemigrations/migrate). O `admin.py` registra os models, o `forms.py` monta os ModelForms a partir deles, e as views buscam dados neles pelo ORM.
 
 ### `catalogo/admin.py` – o painel /admin/
-Registra os 5 models no admin. `JogoAdmin` e `AvaliacaoAdmin` usam `list_display` pra mostrar mais colunas na lista. É o único lugar onde se cadastram categorias e plataformas, e o único onde dá pra preencher país e ano de fundação da desenvolvedora.
+Registra os 6 models no admin. `JogoAdmin`, `AvaliacaoAdmin` e `PerfilAdmin` usam `list_display` pra mostrar mais colunas na lista. É também onde se transforma um usuário em admin do site (marcando "Membro da equipe", que é o `is_staff`). É o único lugar onde se cadastram categorias e plataformas, e o único onde dá pra preencher país e ano de fundação da desenvolvedora.
 
 **Conexões:** usa os models e aparece em `/admin/` por causa do `gamedex/urls.py`.
 
 ### `catalogo/forms.py` – os formulários
 - **JogoForm** (ModelForm de Jogo): a desenvolvedora é um campo de **texto**. No `save()`, ele procura a desenvolvedora pelo nome (sem ligar pra maiúsculas) e cria uma nova se não existir. As categorias aparecem como checkboxes.
-- **AvaliacaoForm** (ModelForm de Avaliacao): só tem nome, nota e comentário. O jogo vem da URL e a data é automática.
+- **AvaliacaoForm** (ModelForm de Avaliacao): só tem nota e comentário. O jogo vem da URL, o usuário é quem está logado (a view coloca os dois) e a data é automática.
+- **PerfilForm** (ModelForm de Perfil): bio e plataforma favorita. O usuário fica de fora pra ninguém editar o perfil de outra pessoa.
+- **FiltroJogoForm** (`forms.Form` normal, não salva nada): os campos de pesquisa da lista (título, categoria, plataforma, desenvolvedora, preço máximo). Serve pra desenhar os campos e conferir os valores que chegam na URL.
+- O cadastro de conta usa o **UserCreationForm**, que já vem pronto no Django.
 
-**Conexões:** é baseado nos models e é usado pelas views `novo_jogo`, `editar_jogo` e `avaliar_jogo`. Aparece nos templates com `{{ form.as_div }}`.
+**Conexões:** é baseado nos models e é usado pelas views (`NovoJogoView`, `EditarJogoView`, `AvaliarJogoView`, `PerfilView`, `ListaJogosView`). Aparece nos templates com `{{ form.as_div }}`.
 
 ### `catalogo/views.py` – a lógica das páginas
-São 7 views em forma de função:
+São 9 views baseadas em classe (CBV). Cada uma herda de uma **view genérica** do Django, que já sabe fazer o caminho comum (buscar, mostrar formulário, validar, salvar, redirecionar). Eu só configuro com atributos (`model`, `form_class`, `template_name`, `success_url`...) e sobrescrevo os métodos que precisam ser diferentes.
 
-| View | URL | Template |
+| View | Herda de | URL | Template | Quem acessa |
+|---|---|---|---|---|
+| `InicioView` | `TemplateView` | `/` | `inicio.html` | todos |
+| `ListaJogosView` | `ListView` | `/jogos/` | `lista_jogos.html` | todos |
+| `DetalheJogoView` | `DetailView` | `/jogos/<pk>/` | `detalhe_jogo.html` | todos |
+| `NovoJogoView` | `CreateView` | `/jogos/novo/` | `form_jogo.html` | admin |
+| `EditarJogoView` | `UpdateView` | `/jogos/<pk>/editar/` | `form_jogo.html` | admin |
+| `ExcluirJogoView` | `DeleteView` | `/jogos/<pk>/excluir/` | `confirmar_exclusao.html` | admin |
+| `AvaliarJogoView` | `CreateView` | `/jogos/<pk>/avaliar/` | `form_avaliacao.html` | logado |
+| `CadastroView` | `CreateView` | `/cadastro/` | `cadastro.html` | todos |
+| `PerfilView` | `UpdateView` | `/perfil/` | `perfil.html` | logado |
+
+Login e logout usam as views prontas do Django (`LoginView` e `LogoutView`), configuradas direto no `urls.py`.
+
+Métodos que eu sobrescrevi e pra quê:
+- `get_queryset()` – na lista, decide quais jogos aparecem (é onde ficam os **filtros**).
+- `get_context_data()` – manda variáveis extras pro template (destaques, avaliações, form de filtro...).
+- `get_object()` – no perfil, troca "buscar pelo pk da URL" por "buscar o perfil de quem está logado".
+- `form_valid()` – roda quando o formulário passou: na avaliação coloca o jogo e o usuário, no cadastro cria o perfil e faz login.
+- `get_success_url()` – pra onde ir depois de salvar.
+- `dispatch()` – o primeiro método da view. Na avaliação busco o jogo aqui, uma vez só.
+
+**Conexões:** são ligadas no `catalogo/urls.py` com `.as_view()`. Usam os models, os forms e devolvem os templates acima.
+
+### 2.1 Níveis de acesso (admin e user)
+
+| Nível | Quem é | O que pode |
 |---|---|---|
-| `inicio` | `/` | `inicio.html` |
-| `lista_jogos` | `/jogos/` | `lista_jogos.html` |
-| `detalhe_jogo` | `/jogos/<id>/` | `detalhe_jogo.html` |
-| `novo_jogo` | `/jogos/novo/` | `form_jogo.html` |
-| `editar_jogo` | `/jogos/<id>/editar/` | `form_jogo.html` |
-| `excluir_jogo` | `/jogos/<id>/excluir/` | `confirmar_exclusao.html` |
-| `avaliar_jogo` | `/jogos/<id>/avaliar/` | `form_avaliacao.html` |
+| visitante | ninguém logado | ver início, lista (com filtros) e detalhes |
+| **user** | conta criada em `/cadastro/` (`is_staff = False`) | tudo do visitante + avaliar jogos + editar o próprio perfil |
+| **admin** | usuário com `is_staff = True` (o `admin` do script ou do `createsuperuser`) | tudo do user + cadastrar, editar e excluir jogos + entrar no `/admin/` |
 
-**Conexões:** são chamadas pelo `catalogo/urls.py`. Usam o model `Jogo` e os forms, e devolvem os templates acima com `render` (ou mandam pra outra URL com `redirect`).
+Como foi feito:
+- **`LoginRequiredMixin`** (pronto do Django): na `AvaliarJogoView` e na `PerfilView`. Quem não está logado vai pra `/login/?next=...` e volta pra página depois de entrar.
+- **`AdminRequiredMixin`** (eu criei, herda do `UserPassesTestMixin`): o `test_func()` devolve `self.request.user.is_staff`. Visitante vai pro login; user comum logado recebe **403** (página `templates/403.html`).
+- O mixin vem **antes** da view genérica na herança (`class NovoJogoView(AdminRequiredMixin, CreateView)`), porque o Python procura os métodos da esquerda pra direita.
+- Nos templates, `{% if user.is_staff %}` e `{% if user.is_authenticated %}` só **escondem** os botões. A proteção de verdade é a da view: mesmo digitando `/jogos/1/excluir/` na mão, o user comum leva 403.
+- Usei o `is_staff` do próprio Django em vez de criar um campo "tipo" porque ele já existe, já é o que libera o `/admin/` e não precisa de nada novo no banco.
+
+### 2.2 Filtros de pesquisa
+
+Na `/jogos/` tem um formulário com `method="get"`, então a busca vai na URL: `/jogos/?titulo=zel&plataforma=3&preco_max=200`. A `ListaJogosView.get_queryset()`:
+1. começa com todos os jogos (`Jogo.objects.all().order_by('titulo')`);
+2. passa o `request.GET` pro `FiltroJogoForm` e chama `is_valid()` (valor inválido, tipo `?categoria=abc`, não quebra a página);
+3. pra cada campo preenchido, aplica um `.filter()`: `titulo__icontains` (contém, sem ligar pra maiúscula), `categorias=`, `plataforma=`, `desenvolvedora=` e `preco__lte` (menor ou igual).
+
+Os `.filter()` vão se juntando num SQL só (vários `AND` no `WHERE`). Uso GET e não POST porque a busca não muda nada no banco e o link com o filtro pode ser salvo ou compartilhado.
 
 ### `catalogo/urls.py` – endereços do app
-Liga cada URL a uma view e dá um `name` pra ela. Esse name é usado no `{% url %}` dos templates e no `redirect()` das views. O `<int:id>` pega o número da URL e passa pra view.
+Liga cada URL a uma view (com `.as_view()`, porque as views são classes) e dá um `name` pra ela. Esse name é usado no `{% url %}` dos templates e no `reverse()` das views. O `<int:pk>` pega o número da URL e passa pra view. Antes era `<int:id>`, mas a DetailView, UpdateView e DeleteView procuram o objeto por um parâmetro chamado `pk`. Também tem as rotas `/cadastro/`, `/login/`, `/logout/` e `/perfil/`.
 
 ### `gamedex/urls.py` – endereços principais
 É o primeiro urls.py que o Django lê (por causa do `ROOT_URLCONF`). Manda `admin/` pro painel e todo o resto pro `catalogo/urls.py` com `include`.
 
 ### `gamedex/settings.py` – configurações
-As mais importantes: `INSTALLED_APPS` (o `catalogo` está lá), `DATABASES` (MySQL, com o SQLite comentado logo acima), `TEMPLATES` (`APP_DIRS=True` faz o Django achar `catalogo/templates/`), `STATIC_URL`, `LANGUAGE_CODE='pt-br'`, `TIME_ZONE`, `DEBUG` e `SECRET_KEY`. Também tem o `MIDDLEWARE`: as camadas que todo pedido atravessa antes da view. Uma delas, o `CsrfViewMiddleware`, é quem confere o `{% csrf_token %}`. Tem ainda `ALLOWED_HOSTS`, `BASE_DIR`, `USE_TZ` e `WSGI_APPLICATION`.
+As mais importantes: `INSTALLED_APPS` (o `catalogo` está lá), `DATABASES` (MySQL, com o SQLite comentado logo acima), `TEMPLATES` (`APP_DIRS=True` faz o Django achar `catalogo/templates/`), `STATIC_URL`, `LANGUAGE_CODE='pt-br'`, `TIME_ZONE`, `DEBUG` e `SECRET_KEY`. Também tem o `MIDDLEWARE`: as camadas que todo pedido atravessa antes da view. Uma delas, o `CsrfViewMiddleware`, é quem confere o `{% csrf_token %}`. Tem ainda `ALLOWED_HOSTS`, `BASE_DIR`, `USE_TZ` e `WSGI_APPLICATION`. No final ficam `LOGIN_URL`, `LOGIN_REDIRECT_URL` e `LOGOUT_REDIRECT_URL`, que dizem pra onde mandar a pessoa no login e no logout.
 
 ### Templates (`catalogo/templates/catalogo/`)
-- **base.html** – o molde de todas as páginas: head, CSS, menu e rodapé. Tem os blocks `titulo` e `conteudo`. Marca no menu o link da página atual.
+- **base.html** – o molde de todas as páginas: head, CSS, menu e rodapé. Tem os blocks `titulo` e `conteudo`. Marca no menu o link da página atual. O menu muda pelo nível: admin vê "Cadastrar jogo" e "Admin", logado vê "Meu perfil" e "Sair" (um formulário POST), visitante vê "Entrar" e "Criar conta".
 - **inicio.html** – a faixa de apresentação + os 3 últimos jogos.
-- **lista_jogos.html** – todos os jogos em cards.
+- **lista_jogos.html** – o formulário de filtros + os jogos encontrados em cards.
 - **card_jogo.html** – pedaço reutilizável (via `include`) com o card de um jogo.
 - **detalhe_jogo.html** – informações do jogo, categorias, botões e avaliações.
 - **form_jogo.html** – formulário de cadastro **e** de edição de jogo.
 - **form_avaliacao.html** – formulário de avaliação.
 - **confirmar_exclusao.html** – a página "tem certeza?" antes de excluir.
+- **login.html**, **cadastro.html** – entrar e criar conta.
+- **perfil.html** – dados do usuário, nível de acesso, formulário do perfil e as avaliações que ele fez.
+- **`templates/403.html`** (fora da pasta `catalogo/`) – a página de "acesso negado". O Django procura esse nome exato quando uma view nega o acesso.
 
 Nos templates, `{{ }}` mostra um valor (com autoescape, que transforma `<` e `>` em texto pra ninguém injetar código) e `{% %}` faz lógica (if, for, url, block...). Comentários de template são `{# #}` e `{% comment %}`. Eles não aparecem no código-fonte da página, ao contrário do `<!-- -->` do HTML.
 
-**Conexões:** todos menos o card e o base fazem `{% extends 'catalogo/base.html' %}`. Os links usam `{% url 'name' %}`, que vem do `catalogo/urls.py`. As variáveis (`jogo`, `jogos`, `form`...) vêm do dicionário que a view passa no `render`.
+**Conexões:** todos menos o card e o base fazem `{% extends 'catalogo/base.html' %}`. Os links usam `{% url 'name' %}`, que vem do `catalogo/urls.py`. As variáveis (`jogo`, `jogos`, `form`...) vêm do contexto que a view monta (`get_context_data`). O `user` está em todo template por causa do context processor `auth`.
 
 ### `catalogo/static/catalogo/css/style.css` – o visual
 Tema escuro roxo. Usa variáveis de cor (`--roxo`, `--fundo`...), flexbox e grid pros layouts e media queries pro celular. Algumas classes vêm do próprio Django, como `.errorlist` nos erros do formulário, e outras do template, como `nota-1` a `nota-5`.
@@ -125,7 +175,7 @@ São arquivos que o `startproject`/`startapp` criaram (ou que o Django gerou) e 
 | `gamedex/wsgi.py` | Porta de entrada pra servidores WSGI (o padrão de como um servidor web conversa com Python). O `runserver` usa o `application` daqui, por causa do `WSGI_APPLICATION` no settings, e um servidor de produção (tipo gunicorn) também usaria. |
 | `gamedex/asgi.py` | Mesma ideia, só que pra servidores ASGI (assíncronos, que aguentam websockets). **Não é usado** neste projeto. |
 | `catalogo/apps.py` | Configuração do app (`CatalogoConfig`). O `'catalogo'` no `INSTALLED_APPS` aponta pra ela. |
-| `catalogo/tests.py` | Lugar dos testes automáticos (`TestCase`, rodam com `manage.py test` num banco separado). **Está vazio**: o projeto não tem testes automáticos e foi testado na mão pelo navegador. |
+| `catalogo/tests.py` | Testes automáticos (`TestCase`). São 12 testes, dos níveis de acesso, do cadastro/perfil e dos filtros. Rodam com `python manage.py test catalogo` num banco separado (`test_gamedex`), que o Django cria e apaga sozinho. |
 | `__init__.py` (em `gamedex/`, `catalogo/` e `migrations/`) | Transformam a pasta num pacote Python, aí dá pra importar `gamedex.settings`, `catalogo.urls` etc. Sem o de `migrations/`, o Django acha que o app não tem migrations. Os de `catalogo/` e `migrations/` estão vazios. O de `gamedex/` tem o `pymysql.install_as_MySQLdb()`, porque ele roda antes de tudo (ver seção 5). |
 | `requirements.txt` | Lista dos pacotes e versões que o projeto precisa: Django 6.1.2, PyMySQL (conexão com o MySQL) e `cryptography` (login no MySQL 8 com senha). `asgiref`, `sqlparse`, `cffi` e `pycparser` vêm junto como dependências. Num computador novo: criar a venv e rodar `pip install -r requirements.txt`. |
 | `banco/gamedex.sql` | Script que cria o banco MySQL inteiro: banco, usuário, tabelas, migrations aplicadas e dados de exemplo (ver seção 5). |
@@ -144,6 +194,7 @@ Uma migration é um arquivo com as instruções pra deixar o banco igual aos mod
 | `0002_alter_jogo_preco` | Adicionou o `MinValueValidator(0)` no preço. | **Não** (no-op): o validator só existe no Python, na validação do formulário |
 | `0003_alter_desenvolvedora_…` | Deixou `pais` e `ano_fundacao` opcionais (`blank`/`null`). Era necessário pro JogoForm conseguir criar uma desenvolvedora só com o nome. | Sim |
 | `0004_alter_…_options` | Adicionou `ordering = ['nome']` em Categoria e Plataforma. | **Não** (no-op): ordering é só a ordem padrão das buscas |
+| `0005_perfil_e_usuario_na_avaliacao` | Criou a tabela do Perfil e trocou o `nome_usuario` (texto) da Avaliação por `usuario` (ForeignKey). **Escrita à mão** em 4 passos: cria a coluna aceitando vazio → um `RunPython` liga cada avaliação antiga a um usuário com o mesmo nome → apaga `nome_usuario` → deixa `usuario` obrigatório. Assim nenhuma avaliação antiga se perdeu. | Sim |
 
 Dá pra conferir o SQL de cada uma com `python manage.py sqlmigrate catalogo 0002`. Nas no-op ele mostra só `-- (no-op)`.
 
@@ -192,14 +243,14 @@ Na primeira rodada de comentários, 5 explicações estavam erradas ou imprecisa
 O Django conecta no MySQL usando uma biblioteca chamada `MySQLdb` (pacote `mysqlclient`). Esse pacote às vezes precisa de compilador pra instalar, principalmente no Windows. O PyMySQL é feito só em Python e instala sem problema. O `pymysql.install_as_MySQLdb()` no `gamedex/__init__.py` registra o PyMySQL com o nome `MySQLdb`, e o Django usa ele sem perceber a troca. O `cryptography` é necessário porque o MySQL 8 usa um tipo de login (`caching_sha2_password`) que precisa de criptografia quando o usuário tem senha.
 
 ### Usuário próprio do projeto
-O script cria o usuário `gamedex` (senha `Gamedex@2026`) com permissão **só no banco gamedex** (`GRANT ALL PRIVILEGES ON gamedex.*`). Isso é o "princípio do menor privilégio": o projeto só pode mexer no que precisa. Se a senha vazar, os outros bancos do MySQL ficam protegidos. E como o usuário é igual em todo computador, o `settings.py` não precisa ser editado. O usuário é criado 3 vezes (`'localhost'`, `'127.0.0.1'` e `'::1'`) porque, dependendo da configuração, o MySQL identifica uma conexão local por um desses nomes.
+O script cria o usuário `gamedex` (senha `Gamedex@2026`) com permissão **só no banco gamedex** (`GRANT ALL PRIVILEGES ON gamedex.*`) e no `test_gamedex`, que é o banco temporário que o `manage.py test` cria pra rodar os testes. Isso é o "princípio do menor privilégio": o projeto só pode mexer no que precisa. Se a senha vazar, os outros bancos do MySQL ficam protegidos. E como o usuário é igual em todo computador, o `settings.py` não precisa ser editado. O usuário é criado 3 vezes (`'localhost'`, `'127.0.0.1'` e `'::1'`) porque, dependendo da configuração, o MySQL identifica uma conexão local por um desses nomes.
 
 ### O que o `banco/gamedex.sql` faz
 1. `DROP DATABASE IF EXISTS` + `CREATE DATABASE ... utf8mb4`: recria o banco do zero, por isso dá pra rodar o script várias vezes.
 2. `CREATE USER IF NOT EXISTS` + `ALTER USER` + `GRANT`: cria o usuário (sem erro se já existir), garante a senha e dá a permissão.
-3. `CREATE TABLE` das 16 tabelas: 10 internas do Django (auth, admin, contenttypes, sessions, django_migrations) e 6 do catálogo, incluindo a `catalogo_jogo_categorias` do ManyToMany.
+3. `CREATE TABLE` das 17 tabelas: 10 internas do Django (auth, admin, contenttypes, sessions, django_migrations) e 7 do catálogo, incluindo a `catalogo_jogo_categorias` do ManyToMany e a `catalogo_perfil` do 1:1.
 4. `INSERT` na `django_migrations`, na `django_content_type` e na `auth_permission`.
-5. `INSERT` dos dados de exemplo e do superusuário `admin` / `admin123`.
+5. `INSERT` dos dados de exemplo, do superusuário `admin` / `admin123`, do usuário comum `usuario` / `usuario123` e dos autores das avaliações de exemplo (sem senha).
 
 **Como ele foi feito:** em vez de escrever as tabelas na mão, rodei o `migrate` num MySQL 8.4 limpo, gravei os dados de exemplo pelo próprio Django e exportei com o `mysqldump`. Assim as tabelas são exatamente as que as migrations criam. Ele foi testado em MySQL 8.4, MariaDB 11.8 e MariaDB 10.11.
 
@@ -226,7 +277,7 @@ Model (dados/banco), View (lógica) e Template (HTML). No projeto: `models.py`, 
 É o resultado de uma busca do ORM, tipo uma lista de objetos. Ele só vai no banco quando eu uso de verdade (no for do template, por exemplo).
 
 **4. Qual a diferença entre `get()`, `filter()` e `get_object_or_404()`?**
-`get()` traz um objeto só e dá erro se não achar. `filter()` traz um QuerySet, que pode vir vazio. `get_object_or_404()` é um get que mostra 404 em vez de erro do servidor. Usei ele nas views de detalhe/editar/excluir/avaliar e o `filter().first()` no `JogoForm` pra procurar a desenvolvedora.
+`get()` traz um objeto só e dá erro se não achar. `filter()` traz um QuerySet, que pode vir vazio. `get_object_or_404()` é um get que mostra 404 em vez de erro do servidor. As views genéricas (DetailView, UpdateView, DeleteView) já fazem esse 404 sozinhas pelo `pk`. Eu ainda uso o `get_object_or_404()` direto na `AvaliarJogoView`, pra buscar o jogo, e o `filter().first()` no `JogoForm` pra procurar a desenvolvedora.
 
 **5. Pra que servem `makemigrations` e `migrate`?**
 `makemigrations` lê os models e gera um arquivo dizendo o que mudou. `migrate` aplica esse arquivo no banco (cria ou altera as tabelas).
@@ -246,11 +297,11 @@ O Decimal guarda o valor exato. O Float pode dar erro de arredondamento, o que �
 **10. O que é um ModelForm e o que o `is_valid()` faz?**
 ModelForm é um formulário gerado a partir de um model, então os campos e as validações já vêm de lá. O `is_valid()` confere os dados (obrigatórios, tipos, preço >= 0, nota entre as opções) e preenche o `cleaned_data`.
 
-**11. Pra que serve o `save(commit=False)` no `avaliar_jogo`?**
-Cria a avaliação sem salvar, porque ainda falta o jogo, que vem da URL e não do formulário. Coloco `avaliacao.jogo = jogo` e aí chamo `avaliacao.save()`.
+**11. Como a avaliação sabe de qual jogo e de qual usuário ela é?**
+Os dois não estão no formulário. Na `AvaliarJogoView.form_valid()` eu coloco `form.instance.jogo = self.jogo` (que veio da URL) e `form.instance.usuario = self.request.user`, e aí o `super().form_valid(form)` salva. Na versão com função isso era feito com `save(commit=False)`.
 
 **12. Qual a diferença entre GET e POST, e de onde vem o `request.POST`?**
-GET é pra pegar uma página e POST é pra enviar dados que mudam alguma coisa. O `request.POST` tem o que a pessoa digitou no formulário. Por isso as views testam `if request.method == 'POST'`.
+GET é pra pegar uma página e POST é pra enviar dados que mudam alguma coisa. O `request.POST` tem o que a pessoa digitou no formulário. Numa view em função eu testava `if request.method == 'POST'`. Nas views em classe, o Django chama o método `get()` ou `post()` da classe conforme o tipo do pedido.
 
 **13. Por que usar `redirect` depois de salvar, e não `render`?**
 Pra evitar envio duplicado. Com render, o F5 reenvia o POST e cadastra de novo. Com redirect o navegador vai pra outra página com GET.
@@ -274,7 +325,7 @@ Pra não escrever endereço na mão. `{% url 'detalhe_jogo' jogo.id %}` vira `/j
 `APP_DIRS=True` faz ele procurar `templates/` dentro de cada app em `INSTALLED_APPS`. Os arquivos estáticos ficam em `static/` do app, e o `{% static %}` monta o endereço com o `STATIC_URL`.
 
 **20. Por que as views não têm `@login_required`?**
-O site não tem login de usuário, a pessoa só digita o nome na avaliação. O único lugar com login é o `/admin/`, que o Django já protege sozinho.
+O `@login_required` é um decorator pra views em função. Como as views agora são classes, uso o equivalente delas: o `LoginRequiredMixin` (e o `AdminRequiredMixin` pras páginas de admin).
 
 **21. Qual a diferença entre projeto e app?**
 O projeto (`gamedex`) é o site inteiro: settings, URLs principais, wsgi. O app (`catalogo`) é uma parte com uma função, com models, views, templates e URLs próprios. Um projeto pode ter vários apps, e cada app precisa estar no `INSTALLED_APPS`.
@@ -291,8 +342,8 @@ O `CsrfViewMiddleware`, que está no `MIDDLEWARE` do settings. Ele roda antes da
 **25. O que é middleware?**
 São camadas que todo pedido atravessa antes de chegar na view (e a resposta na volta). Cada uma faz uma tarefa: sessão, autenticação, CSRF, segurança. A ordem da lista importa.
 
-**26. Por que o projeto tem 4 migrations?**
-Cada mudança no `models.py` gera uma nova. A 0001 criou as tabelas, a 0002 colocou o validator do preço, a 0003 deixou país e ano opcionais e a 0004 colocou o ordering. A 0002 e a 0004 nem mudam o banco (no-op), porque validator e ordering só existem no Python.
+**26. Por que o projeto tem 5 migrations?**
+Cada mudança no `models.py` gera uma nova. A 0001 criou as tabelas, a 0002 colocou o validator do preço, a 0003 deixou país e ano opcionais, a 0004 colocou o ordering e a 0005 criou o Perfil e ligou a avaliação ao usuário. A 0002 e a 0004 nem mudam o banco (no-op), porque validator e ordering só existem no Python.
 
 **27. De onde vem o `id` se eu não criei esse campo?**
 O Django cria sozinho uma chave primária `id` (BigAutoField, um número que aumenta sozinho) em todo model. Dá pra ver na `0001_initial`. `pk` é outro nome pra ela.
@@ -301,7 +352,7 @@ O Django cria sozinho uma chave primária `id` (BigAutoField, um número que aum
 `manage.py` roda os comandos (runserver, migrate...). `wsgi.py` é a porta de entrada do site pra um servidor web, e o próprio runserver usa ela. `asgi.py` é a versão assíncrona e não é usada aqui.
 
 **29. Como você testou o projeto? Tem testes automáticos?**
-O `tests.py` está vazio, então não tem testes automáticos. Testei na mão: cadastrando, editando, excluindo e avaliando jogos pelo site e conferindo no admin. Se fosse fazer testes, seriam classes `TestCase` rodadas com `python manage.py test`.
+Os dois. Testei na mão pelo navegador e escrevi 12 testes automáticos no `tests.py` (classes `TestCase`): user comum não consegue cadastrar/editar/excluir (403), visitante vai pro login, admin consegue excluir, a avaliação fica no nome de quem está logado, o cadastro cria o perfil e cada filtro traz os jogos certos. Rodam com `python manage.py test catalogo`.
 
 **30. Pra que servem a venv e o `requirements.txt`?**
 A venv é um Python separado só pra este projeto, pra versão do Django não brigar com a de outros projetos. O `requirements.txt` lista os pacotes e versões, e com `pip install -r requirements.txt` qualquer pessoa instala tudo igual.
@@ -329,3 +380,39 @@ Como hash `pbkdf2_sha256`, gerado pelo `make_password`. Não dá pra descobrir a
 
 **38. Se eu mudar um model agora, o que acontece com o script?**
 O fluxo normal continua: `makemigrations` e `migrate`, que funcionam com o usuário `gamedex` porque ele tem permissão de alterar tabelas no banco. Só que o `gamedex.sql` fica desatualizado e precisa ser gerado de novo pra quem for instalar o projeto do zero.
+
+**39. Onde estão as relações 1:N e 1:1 do projeto?**
+1:N: Desenvolvedora→Jogo, Plataforma→Jogo, Jogo→Avaliação, Usuário→Avaliação e Plataforma→Perfil, todas com `ForeignKey`. 1:1: Usuário→Perfil, com `OneToOneField`. E ainda tem o N:N Jogo↔Categoria.
+
+**40. Qual a diferença entre `ForeignKey` e `OneToOneField` no banco?**
+Os dois criam uma coluna `_id`. No `OneToOneField` ela é `UNIQUE`, então não repete: cada usuário tem no máximo um perfil. No `ForeignKey` o mesmo usuário aparece em várias avaliações.
+
+**41. Por que criar um Perfil em vez de colocar bio no User?**
+O `User` é do Django e eu não mexo na tabela dele. O jeito simples de guardar dados a mais é outra tabela ligada 1:1. (O outro jeito seria criar um model de usuário próprio, que é mais complicado e tem que ser feito no começo do projeto.)
+
+**42. O que é uma view baseada em classe e qual a vantagem?**
+É uma view escrita como classe que herda de uma view genérica do Django (`ListView`, `CreateView`...). O caminho comum (GET mostra o form, POST valida, salva e redireciona) já vem pronto, então eu escrevo menos código e só mudo o que é diferente, sobrescrevendo métodos como `get_queryset` ou `form_valid`.
+
+**43. O que é um mixin?**
+Uma classe pequena que eu somo na herança pra ganhar um comportamento. `LoginRequiredMixin` exige login, `UserPassesTestMixin` exige passar no `test_func()`. Ele vem antes da view genérica: `class NovoJogoView(AdminRequiredMixin, CreateView)`.
+
+**44. Como funcionam os dois níveis de usuário?**
+Admin é quem tem `is_staff = True`, user é quem tem `False`. As views de cadastrar/editar/excluir jogo usam o `AdminRequiredMixin`, que bloqueia com 403 quem não é staff. Avaliar e perfil usam o `LoginRequiredMixin`. Uma conta criada pelo site sempre é user, e só um admin consegue promover alguém (no `/admin/`).
+
+**45. Esconder o botão no template já não protege?**
+Não. A pessoa pode digitar a URL na mão ou mandar um POST direto. A proteção de verdade é a do mixin na view. Esconder o botão é só pra tela ficar organizada. Tem um teste (`test_user_comum_nao_pode_cadastrar_editar_nem_excluir`) que manda o POST direto e confere que o jogo não foi apagado.
+
+**46. Como funciona o filtro de pesquisa?**
+O formulário usa GET, então os filtros vão na URL. A `ListaJogosView.get_queryset()` valida com o `FiltroJogoForm` e aplica um `.filter()` pra cada campo preenchido (`titulo__icontains`, `categorias`, `plataforma`, `desenvolvedora`, `preco__lte`). O ORM junta tudo num SQL só.
+
+**47. Dá pra fazer SQL injection pela busca?**
+Não. O ORM manda o texto da busca separado do comando SQL (parâmetro), então ele nunca vira código. E os selects passam pelo `ModelChoiceField`, que só aceita id que existe.
+
+**48. Por que o usuário da avaliação não está no formulário?**
+Se estivesse, alguém podia editar o HTML e mandar a avaliação no nome de outra pessoa. A view coloca `form.instance.usuario = self.request.user` no `form_valid()`. O mesmo vale pro perfil: a URL `/perfil/` não tem id e sempre abre o perfil de quem está logado.
+
+**49. Por que o logout é um formulário e não um link?**
+Desde o Django 5 a `LogoutView` só aceita POST. Com POST + `csrf_token`, outro site não consegue deslogar a pessoa só colocando um link ou uma imagem apontando pra `/logout/`.
+
+**50. Como você migrou as avaliações antigas pra ter usuário?**
+Escrevi a migration 0005 à mão com um `RunPython`: pra cada avaliação, ele pega (ou cria) um usuário com o mesmo nome que estava em `nome_usuario` e liga os dois. Esses usuários ficam com senha `!`, que pro Django significa "sem senha": ninguém entra com eles.
