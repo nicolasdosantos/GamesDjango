@@ -1,18 +1,21 @@
 /* Variáveis de cor: defino as cores uma vez aqui e uso com var(--nome) no resto do arquivo.
-   Se eu quiser trocar o roxo do site, mudo só nesta lista. */
+   Paleta do site: preto, roxo e um verde-menta clarinho pros destaques (preço, nota boa, link ativo).
+   Se eu quiser trocar uma cor, mudo só nesta lista. */
 :root {
-    --fundo: #151826;
-    --card: #1f2336;
-    --card-claro: #2a2f47;
-    --borda: #353b57;
-    --texto: #e8eaf2;
-    --texto-suave: #a0a6bf;
-    --roxo: #8b7cf6;
-    --roxo-escuro: #6c5ce7;
-    --azul: #4fa3e3;
-    --verde: #3fbf8f;
-    --amarelo: #e0b341;
-    --vermelho: #e5484d;
+    --fundo: #0b0b10;
+    --card: #15141f;
+    --card-claro: #1f1d2e;
+    --borda: #2a2740;
+    --texto: #ececf4;
+    --texto-suave: #9d9ab3;
+    --roxo: #8b5cf6;
+    --roxo-claro: #a78bfa;
+    --roxo-escuro: #6d28d9;
+    --menta: #b9f5d0;
+    --amarelo: #f5d76e;
+    --vermelho: #f05264;
+    /* rgba = cor com transparência. Uso nos brilhos (box-shadow) pra parecer luz neon */
+    --brilho-roxo: rgba(139, 92, 246, 0.35);
 }
 
 /* Reset básico: box-sizing faz o padding e a borda contarem dentro da largura,
@@ -25,7 +28,13 @@
    pra o rodapé ficar sempre embaixo mesmo quando tem pouco conteúdo. */
 body {
     margin: 0;
-    background-color: var(--fundo);
+    /* dois gradientes radiais bem fracos atrás de tudo: um brilho roxo no topo e um verde no canto.
+       background-attachment: fixed deixa o fundo parado quando a página rola */
+    background:
+        radial-gradient(ellipse at top, rgba(139, 92, 246, 0.12), transparent 60%),
+        radial-gradient(ellipse at bottom right, rgba(185, 245, 208, 0.05), transparent 50%),
+        var(--fundo);
+    background-attachment: fixed;
     color: var(--texto);
     font-family: "Segoe UI", Roboto, Arial, sans-serif;
     line-height: 1.6;
@@ -52,7 +61,11 @@ h2 {
 
 /* Links e contorno de foco: o outline azul aparece quando a pessoa navega pelo teclado (Tab) */
 a {
-    color: var(--roxo);
+    color: var(--roxo-claro);
+}
+
+a:hover {
+    color: var(--menta);
 }
 
 a:focus-visible,
@@ -60,7 +73,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-    outline: 2px solid var(--azul);
+    outline: 2px solid var(--menta);
     outline-offset: 2px;
 }
 
@@ -82,7 +95,7 @@ textarea:focus-visible {
 /* Caixa de mensagem quando não tem nada pra mostrar (ex: "Nenhum jogo cadastrado ainda.") */
 .vazio {
     color: var(--texto-suave);
-    background-color: var(--card);
+    background-color: rgba(21, 20, 31, 0.7);
     border: 1px dashed var(--borda);
     border-radius: 8px;
     padding: 20px;
@@ -99,10 +112,14 @@ textarea:focus-visible {
 
 .botao {
     display: inline-block;
-    background-color: var(--roxo-escuro);
+    /* linear-gradient = degradê do roxo pro roxo escuro na diagonal (135 graus) */
+    background: linear-gradient(135deg, var(--roxo), var(--roxo-escuro));
     color: #ffffff;
-    border: 2px solid var(--roxo-escuro);
-    border-radius: 6px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    box-shadow: 0 0 14px var(--brilho-roxo);
+    /* transition faz a mudança do hover acontecer suave, em 0.2 segundos, em vez de "pular" */
+    transition: transform 0.2s, box-shadow 0.2s;
     padding: 10px 20px;
     font-size: 1rem;
     font-weight: 600;
@@ -112,29 +129,32 @@ textarea:focus-visible {
 }
 
 .botao:hover {
-    background-color: var(--roxo);
-    border-color: var(--roxo);
+    color: #ffffff;
+    /* translateY(-2px) sobe o botão 2 pixels, dando a sensação de que ele "levanta" */
+    transform: translateY(-2px);
+    box-shadow: 0 0 22px rgba(139, 92, 246, 0.6);
 }
 
 .botao-secundario {
-    background-color: transparent;
+    background: transparent;
     color: var(--texto);
-    border-color: var(--borda);
+    border-color: var(--roxo);
+    box-shadow: none;
 }
 
 .botao-secundario:hover {
-    background-color: var(--card-claro);
-    border-color: var(--texto-suave);
+    color: var(--menta);
+    border-color: var(--menta);
+    box-shadow: 0 0 14px rgba(185, 245, 208, 0.25);
 }
 
 .botao-perigo {
-    background-color: var(--vermelho);
-    border-color: var(--vermelho);
+    background: var(--vermelho);
+    box-shadow: 0 0 14px rgba(240, 82, 100, 0.35);
 }
 
 .botao-perigo:hover {
-    background-color: #c93a3f;
-    border-color: #c93a3f;
+    box-shadow: 0 0 22px rgba(240, 82, 100, 0.6);
 }
 
 .botao-pequeno {
@@ -143,9 +163,16 @@ textarea:focus-visible {
 }
 
 /* Menu do topo (navbar). A classe .ativo é colocada pelo base.html no link da página atual */
+/* position: sticky deixa o menu grudado no topo quando a página rola.
+   O fundo é meio transparente e o backdrop-filter borra o que passa por trás dele */
 .navbar {
-    background-color: var(--card);
-    border-bottom: 3px solid var(--roxo-escuro);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: rgba(11, 11, 16, 0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--roxo);
+    box-shadow: 0 0 18px var(--brilho-roxo);
 }
 
 .navbar-conteudo {
@@ -159,6 +186,12 @@ textarea:focus-visible {
 }
 
 .logo {
+    /* o texto do logo é pintado com um degradê: o background vira o degradê, o background-clip: text
+       recorta ele no formato das letras e o color: transparent deixa o degradê aparecer */
+    background: linear-gradient(90deg, var(--roxo-claro), var(--menta));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     font-family: "Chakra Petch", sans-serif;
     font-size: 1.6rem;
     font-weight: 700;
@@ -185,8 +218,9 @@ textarea:focus-visible {
 }
 
 .menu a.ativo {
-    color: var(--texto);
-    background-color: var(--roxo-escuro);
+    color: var(--menta);
+    background-color: rgba(139, 92, 246, 0.18);
+    box-shadow: inset 0 -2px 0 var(--menta);
 }
 
 /* Rodapé */
@@ -204,22 +238,23 @@ textarea:focus-visible {
 
 /* Faixa de apresentação da página inicial (hero) */
 .hero {
-    background-color: var(--card);
-    border: 1px solid var(--borda);
-    border-left: 6px solid var(--roxo);
-    border-radius: 10px;
-    padding: 40px;
+    background: linear-gradient(135deg, rgba(109, 40, 217, 0.55), rgba(21, 20, 31, 0.9) 60%);
+    border: 1px solid var(--roxo);
+    border-radius: 16px;
+    box-shadow: 0 0 30px var(--brilho-roxo);
+    padding: 48px 40px;
     margin-bottom: 16px;
 }
 
 .hero h1 {
-    font-size: 3rem;
+    font-size: 3.4rem;
+    text-shadow: 0 0 24px var(--brilho-roxo);
     margin-bottom: 4px;
 }
 
 .hero-subtitulo {
     font-size: 1.3rem;
-    color: var(--roxo);
+    color: var(--menta);
     font-weight: 600;
     margin: 0;
 }
@@ -257,42 +292,48 @@ textarea:focus-visible {
     flex-direction: column;
     background-color: var(--card);
     border: 1px solid var(--borda);
-    border-radius: 10px;
+    border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+/* No hover o card sobe um pouco e ganha borda e brilho roxos */
+.card:hover {
+    transform: translateY(-4px);
+    border-color: var(--roxo);
+    box-shadow: 0 8px 24px var(--brilho-roxo);
 }
 
 .card-capa {
-    height: 110px;
+    height: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #2b2560;
+    background: linear-gradient(135deg, #3b1d7a, #15141f);
 }
 
 .card-capa span {
     font-family: "Chakra Petch", sans-serif;
     font-size: 4rem;
     font-weight: 700;
-    color: var(--roxo);
+    color: var(--roxo-claro);
+    text-shadow: 0 0 18px rgba(167, 139, 250, 0.7);
 }
 
-/* nth-child alterna a cor da capa dos cards: o 2º, 5º, 8º... fica azul e o 3º, 6º, 9º... fica verde.
+/* nth-child alterna a capa dos cards: o 2º, 5º, 8º... fica roxo mais escuro e o 3º, 6º, 9º... fica verde-menta.
    Fiz isso pra variar a cor, já que os jogos não têm imagem de capa */
 .card:nth-child(3n+2) .card-capa {
-    background-color: #1d3550;
-}
-
-.card:nth-child(3n+2) .card-capa span {
-    color: var(--azul);
+    background: linear-gradient(135deg, #24124d, #0f0e17);
 }
 
 .card:nth-child(3n+3) .card-capa {
-    background-color: #1c4038;
+    background: linear-gradient(135deg, #1d4a3a, #15141f);
 }
 
 .card:nth-child(3n+3) .card-capa span {
-    color: var(--verde);
+    color: var(--menta);
+    text-shadow: 0 0 18px rgba(185, 245, 208, 0.6);
 }
 
 /* Corpo do card. margin-top: auto no rodapé empurra o preço e o botão pro fundo,
@@ -326,6 +367,7 @@ textarea:focus-visible {
 .preco {
     font-weight: 700;
     font-size: 1.1rem;
+    color: var(--menta);
 }
 
 /* Etiquetas das categorias (usadas no card e no detalhe) */
@@ -337,9 +379,9 @@ textarea:focus-visible {
 }
 
 .tag {
-    background-color: var(--card-claro);
-    color: var(--texto);
-    border: 1px solid var(--borda);
+    background-color: rgba(139, 92, 246, 0.12);
+    color: var(--roxo-claro);
+    border: 1px solid rgba(139, 92, 246, 0.4);
     border-radius: 20px;
     padding: 2px 12px;
     font-size: 0.85rem;
@@ -353,7 +395,8 @@ textarea:focus-visible {
 .detalhe {
     background-color: var(--card);
     border: 1px solid var(--borda);
-    border-radius: 10px;
+    border-top: 3px solid var(--roxo);
+    border-radius: 14px;
     padding: 32px;
 }
 
@@ -366,7 +409,8 @@ textarea:focus-visible {
 
 .detalhe-info div {
     background-color: var(--card-claro);
-    border-radius: 8px;
+    border: 1px solid var(--borda);
+    border-radius: 10px;
     padding: 12px;
 }
 
@@ -392,6 +436,7 @@ textarea:focus-visible {
 .avaliacao {
     background-color: var(--card);
     border: 1px solid var(--borda);
+    border-left: 3px solid var(--roxo);
     border-radius: 10px;
     padding: 16px 20px;
     margin-bottom: 12px;
@@ -415,7 +460,7 @@ textarea:focus-visible {
 }
 
 /* Cor da nota: as classes nota-1 a nota-5 vêm do template (nota-{{ avaliacao.nota }}).
-   1 e 2 vermelho, 3 amarelo, 4 e 5 verde */
+   1 e 2 vermelho, 3 amarelo, 4 e 5 verde-menta */
 .nota {
     border-radius: 6px;
     padding: 2px 10px;
@@ -433,7 +478,7 @@ textarea:focus-visible {
 }
 
 .nota-4, .nota-5 {
-    background-color: var(--verde);
+    background-color: var(--menta);
 }
 
 /* Formulários (form_jogo, form_avaliacao, login, cadastro e perfil). O {{ form.as_div }} gera cada campo dentro
@@ -443,7 +488,9 @@ textarea:focus-visible {
     margin: 0 auto;
     background-color: var(--card);
     border: 1px solid var(--borda);
-    border-radius: 10px;
+    border-top: 3px solid var(--roxo);
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
     padding: 32px;
 }
 
@@ -468,6 +515,14 @@ textarea:focus-visible {
     padding: 10px 12px;
     font-size: 1rem;
     font-family: inherit;
+}
+
+/* campo selecionado ganha borda roxa com brilho (o outline menta do teclado continua por cima) */
+.formulario input:focus,
+.formulario select:focus,
+.formulario textarea:focus {
+    border-color: var(--roxo);
+    box-shadow: 0 0 0 3px var(--brilho-roxo);
 }
 
 .formulario textarea {
@@ -545,7 +600,7 @@ textarea:focus-visible {
 }
 
 .form-sair button:hover {
-    color: var(--texto);
+    color: var(--menta);
     background-color: var(--card-claro);
 }
 
@@ -557,7 +612,8 @@ textarea:focus-visible {
     gap: 0 16px;
     background-color: var(--card);
     border: 1px solid var(--borda);
-    border-radius: 10px;
+    border-top: 3px solid var(--roxo);
+    border-radius: 14px;
     padding: 20px 20px 4px;
     margin-bottom: 16px;
 }
