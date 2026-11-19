@@ -1,11 +1,5 @@
+{# o Django usa esse template quando o AdminRequiredMixin barra um user comum #}
 {% extends 'catalogo/base.html' %}
-{% comment %}
-    403.html: página de "acesso proibido".
-    O Django procura um template chamado exatamente 403.html quando uma view nega o acesso.
-    Aqui isso acontece quando um usuário comum (user) tenta abrir uma página só de admin,
-    por exemplo digitando /jogos/1/editar/ na barra de endereço (o AdminRequiredMixin bloqueia).
-    Ele fica na pasta templates/ do app, fora da pasta catalogo/, porque o Django procura pelo nome "403.html" puro.
-{% endcomment %}
 
 {% block titulo %}Acesso negado - GameDex{% endblock %}
 

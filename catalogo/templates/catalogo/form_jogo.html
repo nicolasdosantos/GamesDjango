@@ -1,25 +1,15 @@
 {% extends 'catalogo/base.html' %}
-{% comment %}
-    form_jogo.html: formulário de jogo, usado tanto pra CADASTRAR quanto pra EDITAR.
-    É renderizado pelas views NovoJogoView e EditarJogoView (só admin), que mandam o "form" (JogoForm)
-    e o "titulo_pagina". Uso um template só pros dois porque os campos são os mesmos.
-    O que muda é o título e se o form vem vazio ou preenchido, e isso a view já resolve.
-{% endcomment %}
 
 {% block titulo %}{{ titulo_pagina }} - GameDex{% endblock %}
 
 {% block conteudo %}
+{# mesmo template pra cadastrar e editar, só muda o titulo_pagina #}
+{# method="post" sem action: envia pra mesma URL, e a view (Create ou Update) trata o POST #}
 <section class="caixa-formulario">
     <h1>{{ titulo_pagina }}</h1>
 
-    {% comment %}
-        Sem action, o form envia pra mesma URL em que está: /jogos/novo/ quando é cadastro
-        e /jogos/<id>/editar/ quando é edição. Por isso o mesmo HTML funciona nos dois casos.
-    {% endcomment %}
     <form method="post" class="formulario">
-        {# código de segurança que o Django confere em todo POST (proteção CSRF) #}
         {% csrf_token %}
-        {# desenha todos os campos do JogoForm com label e erros. As categorias saem como checkboxes por causa do widget no forms.py #}
         {{ form.as_div }}
 
         <div class="botoes">

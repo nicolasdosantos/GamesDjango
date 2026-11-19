@@ -1,9 +1,4 @@
 {% extends 'catalogo/base.html' %}
-{% comment %}
-    detalhe_jogo.html: página com todas as informações de um jogo e as avaliações dele.
-    É renderizada pela DetalheJogoView, que manda as variáveis "jogo" e "avaliacoes".
-    Pelo extends ela usa o base.html e só preenche os blocks titulo e conteudo.
-{% endcomment %}
 
 {% block titulo %}{{ jogo.titulo }} - GameDex{% endblock %}
 
@@ -13,7 +8,6 @@
 <section class="detalhe">
     <h1>{{ jogo.titulo }}</h1>
 
-    {# dl/dt/dd é uma "lista de definições" do HTML: dt é o nome da informação e dd é o valor #}
     <dl class="detalhe-info">
         <div>
             <dt>Desenvolvedora</dt>
@@ -29,72 +23,52 @@
         </div>
         <div>
             <dt>Preço</dt>
-            {# mesma regra do card: preço 0 aparece como "Gratuito" #}
             <dd>{% if jogo.preco %}R$ {{ jogo.preco }}{% else %}Gratuito{% endif %}</dd>
         </div>
     </dl>
 
     <h2>Descrição</h2>
-    {% comment %}
-        O filtro linebreaksbr troca as quebras de linha do texto por <br>, senão a descrição
-        aparecia toda emendada numa linha só. Ele continua escapando o HTML que a pessoa digitou,
-        então ninguém consegue colocar código na página pela descrição.
-    {% endcomment %}
     <p class="descricao">{{ jogo.descricao|linebreaksbr }}</p>
 
     <h2>Categorias</h2>
     <div class="tags">
+        {# categorias do jogo (relação N:N) #}
         {% for categoria in jogo.categorias.all %}
         <span class="tag">{{ categoria.nome }}</span>
         {% endfor %}
     </div>
 
-    {% comment %}
-        Os botões mudam conforme o nível do usuário:
-        - logado (user ou admin): pode avaliar
-        - visitante: vê um link pra entrar. O ?next= faz o login voltar pra cá depois de entrar
-          (request.path é o endereço desta página, tipo /jogos/5/).
-        - admin: também vê editar e excluir
-        Mesmo que alguém abra o endereço de editar/excluir na mão, a view bloqueia (AdminRequiredMixin).
-    {% endcomment %}
     <div class="botoes">
+        {# quem não tá logado vai pro login e volta pra cá depois (next) #}
         {% if user.is_authenticated %}
         <a href="{% url 'avaliar_jogo' jogo.id %}" class="botao">Avaliar jogo</a>
         {% else %}
         <a href="{% url 'login' %}?next={{ request.path }}" class="botao">Entre para avaliar</a>
         {% endif %}
 
+        {# editar e excluir só aparecem pro admin #}
         {% if user.is_staff %}
         <a href="{% url 'editar_jogo' jogo.id %}" class="botao botao-secundario">Editar</a>
-        {# esse link só abre a página de confirmação (GET). Quem apaga mesmo é o formulário de lá #}
         <a href="{% url 'excluir_jogo' jogo.id %}" class="botao botao-perigo">Excluir</a>
         {% endif %}
     </div>
 </section>
 
 <section class="avaliacoes">
-    {# o filtro length conta quantos itens tem na lista #}
     <h2>Avaliações ({{ avaliacoes|length }})</h2>
 
     {% for avaliacao in avaliacoes %}
     <article class="avaliacao">
         <div class="avaliacao-topo">
-            {# avaliacao.usuario é o User (ForeignKey), e o .username é o nome de login dele #}
             <strong>{{ avaliacao.usuario.username }}</strong>
-            {# a classe vira "nota-1", "nota-5" etc., e o CSS usa isso pra pintar a nota de vermelho, amarelo ou verde #}
             <span class="nota nota-{{ avaliacao.nota }}">Nota: {{ avaliacao.nota }}/5</span>
         </div>
-        {# o comentário é opcional (blank=True no model), então só mostro o parágrafo se tiver texto #}
         {% if avaliacao.comentario %}
         <p>{{ avaliacao.comentario }}</p>
         {% endif %}
-        {# o filtro date formata a data no padrão brasileiro: dia/mês/ano #}
         <p class="avaliacao-data">{{ avaliacao.data|date:"d/m/Y" }}</p>
     </article>
-    {% comment %}
-        {% empty %} é uma parte do for que só aparece quando a lista está vazia.
-        É mais curto que fazer um if antes do for só pra ver se tem avaliação.
-    {% endcomment %}
+    {# empty roda quando a lista tá vazia #}
     {% empty %}
     <p class="vazio">Este jogo ainda não tem avaliações.</p>
     {% endfor %}

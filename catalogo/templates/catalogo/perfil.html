@@ -1,11 +1,4 @@
 {% extends 'catalogo/base.html' %}
-{% comment %}
-    perfil.html: página "Meu perfil".
-    É renderizada pela PerfilView (só pra quem está logado), que manda:
-    - "form": o PerfilForm, já preenchido com o perfil de quem está logado
-    - "minhas_avaliacoes": as avaliações que essa pessoa já fez
-    Aqui aparecem as duas relações do usuário: o perfil (1:1) e as avaliações (1:N).
-{% endcomment %}
 
 {% block titulo %}Meu perfil - GameDex{% endblock %}
 
@@ -20,13 +13,13 @@
         </div>
         <div>
             <dt>Nível de acesso</dt>
-            {# is_staff = True é o admin do site, False é o usuário comum #}
             <dd>{% if user.is_staff %}Administrador{% else %}Usuário{% endif %}</dd>
         </div>
     </dl>
 
-    {# sem action: o POST vai pra própria /perfil/, e a PerfilView salva no perfil de quem está logado #}
     <form method="post" class="formulario">
+        {# csrf_token: campo escondido com um código que o Django confere no POST; impede que outro site #}
+        {# envie um formulário pra cá usando o login da pessoa. Sem ele o Django recusa (erro 403) #}
         {% csrf_token %}
         {{ form.as_div }}
         <div class="botoes">
@@ -38,10 +31,10 @@
 <section class="avaliacoes">
     <h2>Minhas avaliações ({{ minhas_avaliacoes|length }})</h2>
 
+    {# avaliações do usuário logado (vem da PerfilView) #}
     {% for avaliacao in minhas_avaliacoes %}
     <article class="avaliacao">
         <div class="avaliacao-topo">
-            {# link pro jogo avaliado. avaliacao.jogo é o ForeignKey pro Jogo #}
             <a href="{% url 'detalhe_jogo' avaliacao.jogo.id %}"><strong>{{ avaliacao.jogo.titulo }}</strong></a>
             <span class="nota nota-{{ avaliacao.nota }}">Nota: {{ avaliacao.nota }}/5</span>
         </div>
