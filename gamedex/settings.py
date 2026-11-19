@@ -12,45 +12,16 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-# BASE_DIR é a pasta raiz do projeto (onde fica o manage.py). Path(__file__) é este settings.py,
-# e os dois .parent sobem duas pastas: primeiro pra gamedex/ e depois pra raiz.
-# Uso ele pra montar caminhos que funcionam em qualquer computador, tipo o do arquivo do SQLite lá embaixo.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY é uma chave secreta que o Django usa pra assinar dados, por exemplo a sessão de quem
-# está logado no admin e os links de redefinir senha. Se alguém descobrir, consegue falsificar essas assinaturas.
-# (O csrf_token NÃO usa a SECRET_KEY: ele é um código aleatório guardado num cookie, e quem confere
-# é o CsrfViewMiddleware, lá no MIDDLEWARE.)
-# Essa aqui foi gerada pelo startproject e serve só pra desenvolvimento ("django-insecure").
-# Num site de verdade ela não poderia ficar escrita no código.
 SECRET_KEY = 'django-insecure-kdkeq@ze806s7io)qzf5m4ybzog%$7kppkbtni#q38vc-%87e%'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True mostra a página amarela de erro com todos os detalhes (código, variáveis),
-# o que ajuda muito enquanto eu estou programando. Também é por causa dele que o
-# runserver entrega os arquivos de static/ sozinho.
-# Num site publicado tem que ser False, senão qualquer um vê os detalhes internos quando der erro.
 DEBUG = True
 
-# ALLOWED_HOSTS é a lista de endereços (domínios) pelos quais o site pode ser acessado.
-# Vazia e com DEBUG = True, o Django só aceita localhost e 127.0.0.1, que é o que eu uso no runserver.
-# Num site publicado eu teria que colocar o domínio aqui, senão todo pedido dá erro 400.
 ALLOWED_HOSTS = []
 
 
-# Application definition
-
-# INSTALLED_APPS é a lista de apps que o projeto usa. Os do django.contrib já vêm prontos:
-# admin (o painel /admin/), auth (usuários e login do admin), sessions (lembrar quem está logado),
-# messages, staticfiles (CSS/imagens) etc.
-# O 'catalogo' é o meu app. Ele PRECISA estar aqui, senão o Django não acha os models
-# (o makemigrations não vê nada), os templates e o static dele.
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -58,16 +29,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'catalogo',
+    'catalogo',  # app do projeto
 ]
 
-# Middlewares são "camadas" que todo pedido atravessa antes de chegar na view (e a resposta atravessa
-# na volta). Cada um faz uma tarefa, por exemplo:
-# - SessionMiddleware: cuida da sessão (o Django lembrar de quem está logado entre uma página e outra)
-# - CsrfViewMiddleware: é ELE que confere o {% csrf_token %} em todo POST e devolve erro 403 se faltar
-# - AuthenticationMiddleware: coloca o usuário logado em request.user (usado pelo admin)
-# A ordem importa, porque um depende do outro (a autenticação precisa da sessão, por exemplo).
-# Veio pronto do startproject e eu não mexi.
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -78,25 +42,16 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Diz qual é o urls.py principal, onde o Django começa a procurar a URL de cada pedido.
 ROOT_URLCONF = 'gamedex.urls'
 
-# TEMPLATES configura como o Django acha e monta os arquivos HTML.
 TEMPLATES = [
     {
-        # Usa a linguagem de templates do próprio Django ({{ }}, {% %}).
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # DIRS vazio = não tenho pasta de templates fora dos apps.
         'DIRS': [],
-        # APP_DIRS = True faz o Django procurar uma pasta "templates" dentro de cada app.
-        # É por isso que o render(request, 'catalogo/lista_jogos.html') acha o arquivo em
-        # catalogo/templates/catalogo/lista_jogos.html. Repeti o nome "catalogo" dentro de templates/
-        # pra não misturar com templates de outros apps que tenham o mesmo nome de arquivo.
         'APP_DIRS': True,
         'OPTIONS': {
-            # context_processors colocam variáveis em TODOS os templates automaticamente.
-            # O de 'request' é o que deixa eu usar {{ request }} no base.html pra marcar o menu ativo.
             'context_processors': [
+                # request e auth deixam usar request e user nos templates
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -105,21 +60,23 @@ TEMPLATES = [
     },
 ]
 
-# Aponta pro objeto "application" que está no gamedex/wsgi.py.
-# O runserver usa ele pra rodar o site, e um servidor de produção usaria também.
 WSGI_APPLICATION = 'gamedex.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+# banco usado: MySQL (o banco e o usuário são criados pelo banco/gamedex.sql)
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'gamedex',
+        'USER': 'gamedex',
+        'PASSWORD': 'Gamedex@2026',
+        'HOST': 'localhost',
+        'PORT': '3306',
+        'OPTIONS': {'charset': 'utf8mb4'},
+    }
+}
 
-# DATABASES diz qual banco de dados o projeto usa.
-
-# --- SQLite (o banco que o projeto usava antes) ---
-# O SQLite já vem com o Python e guarda tudo num arquivo só (db.sqlite3 na raiz do projeto),
-# sem precisar instalar nem ligar servidor de banco. BASE_DIR é a pasta raiz (definida lá em cima).
-# PRA VOLTAR PRO SQLITE: tire o "#" das 6 linhas abaixo e coloque "#" no bloco do MySQL mais embaixo.
-# O db.sqlite3 continua no projeto com os dados antigos, então não precisa rodar nenhum script.
+# SQLite (opcional, não precisa instalar nada)
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
@@ -127,37 +84,8 @@ WSGI_APPLICATION = 'gamedex.wsgi.application'
 #     }
 # }
 
-# --- MySQL (o banco que o projeto usa agora) ---
-# Ao contrário do SQLite, o MySQL é um servidor separado: precisa estar instalado e ligado,
-# e o Django conecta nele por rede (host + porta) com usuário e senha.
-# O banco "gamedex" e o usuário "gamedex" são criados pelo script banco/gamedex.sql.
-# Criei um usuário só do projeto em vez de usar o root porque ele só tem permissão no banco gamedex:
-# se a senha vazar, ninguém mexe nos outros bancos do MySQL. E o root de cada computador tem uma
-# senha diferente, enquanto este usuário é igual em todo lugar, então o projeto conecta sem editar nada.
-DATABASES = {
-    'default': {
-        # Diz pro Django usar o "tradutor" de MySQL (o ORM gera SQL do jeito que o MySQL entende).
-        # A conexão em si é feita pela biblioteca PyMySQL (ver gamedex/__init__.py).
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'gamedex',           # nome do banco dentro do MySQL
-        'USER': 'gamedex',           # usuário criado pelo script
-        'PASSWORD': 'Gamedex@2026',  # senha com maiúscula, número e símbolo, pra passar na política de senha do MySQL
-        'HOST': 'localhost',         # o MySQL está no mesmo computador
-        'PORT': '3306',              # porta padrão do MySQL
-        'OPTIONS': {
-            # utf8mb4 é o UTF-8 "completo" do MySQL: aceita acentos, ç e até emoji.
-            # O Django já usa ele por padrão, mas deixei escrito pra ficar claro.
-            'charset': 'utf8mb4',
-        },
-    }
-}
 
-
-# Password validation
-# https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
-
-# Regras de senha (parecida com o nome do usuário, curta demais, muito comum, só números).
-# Valem quando cria ou troca senha de usuário, tipo no createsuperuser e no admin.
+# regras de senha usadas no cadastro
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -174,41 +102,20 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/6.1/topics/i18n/
-
-# Idioma do Django. Com 'pt-br' o admin e as mensagens de erro dos formulários
-# (tipo "Este campo é obrigatório.") aparecem em português.
+# português e horário de Brasília
 LANGUAGE_CODE = 'pt-br'
 
-# Fuso horário usado pra mostrar datas e horas e pra saber que dia é "hoje" (o auto_now_add da avaliação usa isso).
-# O startproject cria essa linha com 'UTC' (3 horas na frente de Brasília), então eu troquei pra São Paulo.
-# Se eu apagasse a linha não ficaria UTC: o padrão interno do Django é 'America/Chicago'.
 TIME_ZONE = 'America/Sao_Paulo'
 
-# USE_I18N liga o sistema de tradução do Django. É ele que faz o LANGUAGE_CODE = 'pt-br' funcionar.
 USE_I18N = True
 
-# USE_TZ = True: datas COM hora são guardadas no banco em UTC e convertidas pro TIME_ZONE na hora de mostrar.
-# Nos meus models só tem DateField (data sem hora), então no projeto isso quase não aparece.
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.1/howto/static-files/
-
-# Arquivos estáticos são os que não mudam de pedido pra pedido: CSS, imagens, JavaScript.
-# STATIC_URL é o começo do endereço deles no site. Por isso o {% static 'catalogo/css/style.css' %}
-# no base.html vira "/static/catalogo/css/style.css".
-# O Django procura esses arquivos na pasta "static" de cada app (catalogo/static/).
+# endereço dos arquivos de CSS
 STATIC_URL = 'static/'
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-# Configuração de envio de e-mail que veio do startproject. O backend "console" só mostra o e-mail
-# no terminal em vez de enviar. O projeto não manda e-mail, então isso não é usado.
 MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
@@ -216,13 +123,7 @@ MAILERS = {
 }
 
 
-# Login e logout
-# Configurações usadas pelas views de login do Django e pelo LoginRequiredMixin/AdminRequiredMixin.
-# Todas usam o name da URL (do catalogo/urls.py), e o Django transforma no endereço certo.
-
-# LOGIN_URL: pra onde mandar quem tenta abrir uma página que precisa de login (ex: avaliar um jogo).
+# pra onde vai o usuário no login/logout
 LOGIN_URL = 'login'
-# LOGIN_REDIRECT_URL: pra onde ir depois de entrar, quando a URL não tem ?next=.
 LOGIN_REDIRECT_URL = 'inicio'
-# LOGOUT_REDIRECT_URL: pra onde ir depois de sair.
 LOGOUT_REDIRECT_URL = 'inicio'

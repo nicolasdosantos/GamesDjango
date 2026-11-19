@@ -1,6 +1,4 @@
-/* Variáveis de cor: defino as cores uma vez aqui e uso com var(--nome) no resto do arquivo.
-   Paleta do site: preto, roxo e um verde-menta clarinho pros destaques (preço, nota boa, link ativo).
-   Se eu quiser trocar uma cor, mudo só nesta lista. */
+/* Cores */
 :root {
     --fundo: #0b0b10;
     --card: #15141f;
@@ -14,22 +12,17 @@
     --menta: #b9f5d0;
     --amarelo: #f5d76e;
     --vermelho: #f05264;
-    /* rgba = cor com transparência. Uso nos brilhos (box-shadow) pra parecer luz neon */
     --brilho-roxo: rgba(139, 92, 246, 0.35);
 }
 
-/* Reset básico: box-sizing faz o padding e a borda contarem dentro da largura,
-   assim um campo com width 100% não passa do tamanho da caixa. */
+/* Reset */
 * {
     box-sizing: border-box;
 }
 
-/* Página inteira: fundo escuro e flex em coluna com altura mínima da tela,
-   pra o rodapé ficar sempre embaixo mesmo quando tem pouco conteúdo. */
+/* Página */
 body {
     margin: 0;
-    /* dois gradientes radiais bem fracos atrás de tudo: um brilho roxo no topo e um verde no canto.
-       background-attachment: fixed deixa o fundo parado quando a página rola */
     background:
         radial-gradient(ellipse at top, rgba(139, 92, 246, 0.12), transparent 60%),
         radial-gradient(ellipse at bottom right, rgba(185, 245, 208, 0.05), transparent 50%),
@@ -43,7 +36,7 @@ body {
     min-height: 100vh;
 }
 
-/* Títulos com a fonte Chakra Petch (carregada do Google Fonts no base.html) */
+/* Títulos */
 h1, h2, h3 {
     font-family: "Chakra Petch", "Segoe UI", sans-serif;
     line-height: 1.2;
@@ -59,7 +52,7 @@ h2 {
     margin-top: 32px;
 }
 
-/* Links e contorno de foco: o outline azul aparece quando a pessoa navega pelo teclado (Tab) */
+/* Links */
 a {
     color: var(--roxo-claro);
 }
@@ -77,8 +70,7 @@ textarea:focus-visible {
     outline-offset: 2px;
 }
 
-/* Layout: .container centraliza o conteúdo com largura máxima, .conteudo é a área principal
-   (flex: 1 faz ela ocupar o espaço que sobra e empurrar o rodapé) */
+/* Layout */
 .container {
     width: 100%;
     max-width: 1000px;
@@ -92,7 +84,7 @@ textarea:focus-visible {
     padding-bottom: 48px;
 }
 
-/* Caixa de mensagem quando não tem nada pra mostrar (ex: "Nenhum jogo cadastrado ainda.") */
+/* Mensagem vazia */
 .vazio {
     color: var(--texto-suave);
     background-color: rgba(21, 20, 31, 0.7);
@@ -101,8 +93,7 @@ textarea:focus-visible {
     padding: 20px;
 }
 
-/* Botões: .botao é o padrão roxo e as outras classes são variações
-   (secundario = sem fundo, perigo = vermelho pra excluir, pequeno = usado no card) */
+/* Botões */
 .botoes {
     display: flex;
     flex-wrap: wrap;
@@ -112,13 +103,11 @@ textarea:focus-visible {
 
 .botao {
     display: inline-block;
-    /* linear-gradient = degradê do roxo pro roxo escuro na diagonal (135 graus) */
     background: linear-gradient(135deg, var(--roxo), var(--roxo-escuro));
     color: #ffffff;
     border: 2px solid transparent;
     border-radius: 8px;
     box-shadow: 0 0 14px var(--brilho-roxo);
-    /* transition faz a mudança do hover acontecer suave, em 0.2 segundos, em vez de "pular" */
     transition: transform 0.2s, box-shadow 0.2s;
     padding: 10px 20px;
     font-size: 1rem;
@@ -130,7 +119,6 @@ textarea:focus-visible {
 
 .botao:hover {
     color: #ffffff;
-    /* translateY(-2px) sobe o botão 2 pixels, dando a sensação de que ele "levanta" */
     transform: translateY(-2px);
     box-shadow: 0 0 22px rgba(139, 92, 246, 0.6);
 }
@@ -162,9 +150,7 @@ textarea:focus-visible {
     font-size: 0.9rem;
 }
 
-/* Menu do topo (navbar). A classe .ativo é colocada pelo base.html no link da página atual */
-/* position: sticky deixa o menu grudado no topo quando a página rola.
-   O fundo é meio transparente e o backdrop-filter borra o que passa por trás dele */
+/* Menu */
 .navbar {
     position: sticky;
     top: 0;
@@ -186,8 +172,6 @@ textarea:focus-visible {
 }
 
 .logo {
-    /* o texto do logo é pintado com um degradê: o background vira o degradê, o background-clip: text
-       recorta ele no formato das letras e o color: transparent deixa o degradê aparecer */
     background: linear-gradient(90deg, var(--roxo-claro), var(--menta));
     -webkit-background-clip: text;
     background-clip: text;
@@ -236,7 +220,7 @@ textarea:focus-visible {
     margin: 0;
 }
 
-/* Faixa de apresentação da página inicial (hero) */
+/* Página inicial */
 .hero {
     background: linear-gradient(135deg, rgba(109, 40, 217, 0.55), rgba(21, 20, 31, 0.9) 60%);
     border: 1px solid var(--roxo);
@@ -264,7 +248,7 @@ textarea:focus-visible {
     margin-bottom: 0;
 }
 
-/* Cabeçalho da lista de jogos: título de um lado e botão do outro */
+/* Cabeçalho da lista */
 .cabecalho-pagina {
     display: flex;
     flex-wrap: wrap;
@@ -278,15 +262,14 @@ textarea:focus-visible {
     margin-bottom: 0;
 }
 
-/* Grade de cards: auto-fill com minmax cria quantas colunas couberem (mínimo 260px cada),
-   então a grade se ajusta sozinha ao tamanho da tela sem precisar de media query */
+/* Grade de cards */
 .grade-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 20px;
 }
 
-/* Card de jogo (card_jogo.html) */
+/* Card de jogo */
 .card {
     display: flex;
     flex-direction: column;
@@ -298,7 +281,7 @@ textarea:focus-visible {
     transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-/* No hover o card sobe um pouco e ganha borda e brilho roxos */
+/* Hover do card */
 .card:hover {
     transform: translateY(-4px);
     border-color: var(--roxo);
@@ -321,8 +304,7 @@ textarea:focus-visible {
     text-shadow: 0 0 18px rgba(167, 139, 250, 0.7);
 }
 
-/* nth-child alterna a capa dos cards: o 2º, 5º, 8º... fica roxo mais escuro e o 3º, 6º, 9º... fica verde-menta.
-   Fiz isso pra variar a cor, já que os jogos não têm imagem de capa */
+/* Cores das capas */
 .card:nth-child(3n+2) .card-capa {
     background: linear-gradient(135deg, #24124d, #0f0e17);
 }
@@ -336,8 +318,7 @@ textarea:focus-visible {
     text-shadow: 0 0 18px rgba(185, 245, 208, 0.6);
 }
 
-/* Corpo do card. margin-top: auto no rodapé empurra o preço e o botão pro fundo,
-   assim todos os cards da mesma linha ficam alinhados embaixo */
+/* Corpo do card */
 .card-corpo {
     display: flex;
     flex-direction: column;
@@ -370,7 +351,7 @@ textarea:focus-visible {
     color: var(--menta);
 }
 
-/* Etiquetas das categorias (usadas no card e no detalhe) */
+/* Categorias */
 .tags {
     display: flex;
     flex-wrap: wrap;
@@ -387,7 +368,7 @@ textarea:focus-visible {
     font-size: 0.85rem;
 }
 
-/* Página de detalhe do jogo (detalhe_jogo.html): caixa principal e grade com as 4 informações */
+/* Detalhe do jogo */
 .link-voltar {
     color: var(--texto-suave);
 }
@@ -428,7 +409,7 @@ textarea:focus-visible {
     max-width: 70ch;
 }
 
-/* Lista de avaliações na página de detalhe */
+/* Avaliações */
 .avaliacoes {
     margin-top: 16px;
 }
@@ -459,8 +440,7 @@ textarea:focus-visible {
     font-size: 0.85rem;
 }
 
-/* Cor da nota: as classes nota-1 a nota-5 vêm do template (nota-{{ avaliacao.nota }}).
-   1 e 2 vermelho, 3 amarelo, 4 e 5 verde-menta */
+/* Cores das notas */
 .nota {
     border-radius: 6px;
     padding: 2px 10px;
@@ -481,8 +461,7 @@ textarea:focus-visible {
     background-color: var(--menta);
 }
 
-/* Formulários (form_jogo, form_avaliacao, login, cadastro e perfil). O {{ form.as_div }} gera cada campo dentro
-   de uma div, por isso uso .formulario > div pra dar espaço entre eles */
+/* Formulários */
 .caixa-formulario {
     max-width: 640px;
     margin: 0 auto;
@@ -517,7 +496,7 @@ textarea:focus-visible {
     font-family: inherit;
 }
 
-/* campo selecionado ganha borda roxa com brilho (o outline menta do teclado continua por cima) */
+/* Campo em foco */
 .formulario input:focus,
 .formulario select:focus,
 .formulario textarea:focus {
@@ -530,7 +509,7 @@ textarea:focus-visible {
     resize: vertical;
 }
 
-/* Checkboxes das categorias: o widget CheckboxSelectMultiple gera um fieldset com um label pra cada opção */
+/* Checkboxes */
 .formulario fieldset {
     border: 1px solid var(--borda);
     border-radius: 6px;
@@ -563,7 +542,7 @@ textarea:focus-visible {
     accent-color: var(--roxo);
 }
 
-/* .errorlist é a classe que o Django coloca na lista de erros quando o is_valid() falha */
+/* Erros */
 .errorlist {
     list-style: none;
     padding: 0;
@@ -572,7 +551,7 @@ textarea:focus-visible {
     font-size: 0.9rem;
 }
 
-/* Página de confirmar exclusão: borda e texto em vermelho pra deixar claro que é uma ação perigosa */
+/* Excluir */
 .caixa-perigo {
     border-top: 4px solid var(--vermelho);
 }
@@ -582,8 +561,7 @@ textarea:focus-visible {
 }
 
 
-/* Botão "Sair" do menu. O logout precisa ser um formulário (POST), mas eu quero que ele
-   pareça igual aos outros links do menu, então tiro o visual padrão de botão. */
+/* Botão sair */
 .form-sair {
     display: inline;
     margin: 0;
@@ -604,8 +582,7 @@ textarea:focus-visible {
     background-color: var(--card-claro);
 }
 
-/* Filtros da lista de jogos: uma caixa com a busca grande em cima e os outros filtros numa grade.
-   A grade coloca os campos lado a lado (quantos couberem na linha, com no mínimo 170px cada). */
+/* Filtros */
 .filtros {
     background-color: var(--card);
     border: 1px solid var(--borda);
@@ -634,7 +611,7 @@ textarea:focus-visible {
     margin-top: 4px;
 }
 
-/* aviso quando algum filtro foi ignorado por ter valor inválido */
+/* Aviso de filtro */
 .aviso-filtro {
     color: var(--amarelo);
     background-color: rgba(245, 215, 110, 0.08);
@@ -643,7 +620,7 @@ textarea:focus-visible {
     padding: 10px 14px;
 }
 
-/* Paginação embaixo dos cards */
+/* Paginação */
 .paginacao {
     display: flex;
     flex-wrap: wrap;
@@ -684,7 +661,7 @@ textarea:focus-visible {
     margin: 0 0 16px;
 }
 
-/* .helptext é a classe dos textos de ajuda dos campos (ex: as regras de senha do cadastro) */
+/* Texto de ajuda */
 .helptext {
     display: block;
     color: var(--texto-suave);
@@ -698,9 +675,7 @@ textarea:focus-visible {
 }
 
 
-/* Responsivo: media queries mudam o layout em telas menores.
-   Até 800px as informações do detalhe ficam em 2 colunas, até 600px fica tudo em 1 coluna
-   e os botões ocupam a largura toda pra ficar fácil de tocar no celular */
+/* Responsivo */
 @media (max-width: 800px) {
     .detalhe-info {
         grid-template-columns: repeat(2, 1fr);
